@@ -70,11 +70,15 @@ There are two views. The **Tactical tab** shows mannequins on a 3D pitch, perfec
 
 ---
 
+https://github.com/user-attachments/assets/17856114-e15b-4f32-a63f-e2b0265d981b
+
 ## Pipeline
 
 ### Pass 1 — Detection, Tracking, Homography, Team Clustering, Pose
 
-<!-- ![Pass 1 pipeline](docs/assets/pipeline_pass1.png) -->
+
+<img width="1376" height="768" alt="pipeline_pass2" src="https://github.com/user-attachments/assets/04ccd276-4cb2-4a4e-a1c6-ffba1e5fef2e" />
+
 
 Every processed frame runs two parallel lanes simultaneously.
 
@@ -84,9 +88,13 @@ Every processed frame runs two parallel lanes simultaneously.
 
 After all frames: TeamAssigner finalises k-means team clusters, assigns goalkeepers by pitch side, and demotes any goalkeeper track found in the midfield zone to player.
 
+
+https://github.com/user-attachments/assets/5abf9b02-8939-49b0-8bd6-f5f4528d2216
+
+
 ### Pass 2 — SMPL-X Mesh Lifting (GVHMR)
 
-<!-- ![Pass 2 pipeline](docs/assets/pipeline_pass2.png) -->
+<img width="1376" height="768" alt="Gemini_Generated_Image_" src="https://github.com/user-attachments/assets/63dbc53d-9641-42e6-adeb-4558596a77d6" />
 
 Triggered separately after Pass 1. Reads the Pass 1 JSON and for each qualifying track (length ≥ 8 frames, median bbox height ≥ 10 px): segments the track bridging gaps ≤ 6 frames with linear interpolation, reads source video frames, runs HMR2 ViT-H to extract (F, 1024) image features, packs those features with the ViTPose keypoints from Pass 1 and estimated camera intrinsics, and runs GVHMR's transformer with `static_cam=True` to get per-frame SMPL-X parameters. Yaw is extracted per frame then zeroed before the SMPL-X vertex forward pass. Vertices are floor-translated so feet sit at Y=0, X-mirrored for Three.js handedness, and encoded as base64 float16. The viewer applies `mesh.rotation.y = gvhmr_yaw + calibration_offset` to restore real body heading per track.
 
