@@ -1,0 +1,18 @@
+# BoT-SORT with appearance ReID + camera motion compensation.
+# Replaces ByteTrack to reduce ID swaps when players cross each other:
+#   - with_reid uses the detector's own appearance features to re-associate
+#     tracks after occlusion (lightweight, no extra model with model: auto)
+#   - gmc_method compensates the broadcast camera's pan between frames, so
+#     motion prediction stays valid while the camera moves
+tracker_type: botsort
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.3
+track_buffer: 30
+match_thresh: 0.8
+fuse_score: True
+gmc_method: sparseOptFlow
+proximity_thresh: 0.5
+appearance_thresh: 0.75
+with_reid: True
+model: auto

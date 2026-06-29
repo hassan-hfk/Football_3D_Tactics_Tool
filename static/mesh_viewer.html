@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Football 3D Tactics — Mesh Viewer</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0e1a; color:#e0e6f0; font-family:'Segoe UI',sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+body.recording { pointer-events:none; }
+body.recording #record-overlay { pointer-events:auto; }
+
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+#topbar { height:44px; background:#111827; border-bottom:1px solid #1f2937; display:flex; align-items:center; padding:0 16px; gap:12px; flex-shrink:0; flex-wrap:wrap; }
+#topbar h1 { font-size:14px; font-weight:700; color:#60a5fa; margin-right:8px; }
+button { padding:5px 12px; border:none; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; }
+.btn-blue { background:#3b82f6; color:#fff; } .btn-green { background:#10b981; color:#fff; }
+.btn-red { background:#ef4444; color:#fff; }
+.btn-blue:disabled, .btn-green:disabled, .btn-red:disabled { background:#374151; color:#6b7280; cursor:not-allowed; }
+select { padding:4px 8px; background:#374151; color:#e0e6f0; border:1px solid #4b5563; border-radius:5px; font-size:12px; }
+input[type=color] { width:32px; height:28px; border:none; border-radius:4px; cursor:pointer; padding:0; }
+label { font-size:12px; color:#9ca3af; display:flex; align-items:center; gap:5px; }
+.sep { width:1px; height:20px; background:#374151; }
+
+#main { flex:1; display:flex; overflow:hidden; }
+#three-panel { flex:1; position:relative; }
+#c { display:block; width:100%; height:100%; }
+
+#hud { position:absolute; top:8px; right:8px; background:rgba(17,24,39,.85); border-radius:8px; padding:8px 12px; font-size:11px; color:#9ca3af; line-height:1.9; }
+#hud b { color:#e0e6f0; }
+
+/* ── Camera presets (top-left) ─────────────────────────────────────────── */
+#cam-row { position:absolute; top:8px; left:8px; display:flex; flex-direction:column; gap:4px; }
+.cbtn { background:rgba(17,24,39,.85); color:#d1d5db; border:1px solid #374151; border-radius:5px; padding:4px 10px; font-size:11px; cursor:pointer; }
+.cbtn:hover { border-color:#3b82f6; color:#93c5fd; }
+
+/* ── Tactical toolbar (left, below cam presets) ────────────────────────── */
+#tactics-panel { position:absolute; left:8px; top:170px; background:rgba(17,24,39,.92); border:1px solid #1f2937; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px; min-width:120px; box-shadow:0 4px 12px rgba(0,0,0,.4); }
+#tactics-panel .tt-title { font-size:10px; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; }
+.tt-btn { background:#1f2937; color:#d1d5db; border:1px solid #374151; border-radius:5px; padding:6px 10px; font-size:11px; cursor:pointer; text-align:left; display:flex; align-items:center; gap:6px; }
+.tt-btn:hover { border-color:#3b82f6; color:#fff; }
+.tt-btn.active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+.tt-btn .tt-icon { display:inline-block; width:14px; text-align:center; font-weight:700; }
+#tactics-panel hr { border:none; border-top:1px solid #374151; margin:4px 0; }
+#tactics-panel .tt-row { display:flex; align-items:center; gap:6px; font-size:11px; color:#9ca3af; }
+#tactics-panel input[type=range] { flex:1; }
+#tactics-panel input[type=number] { width:50px; padding:3px 5px; background:#374151; color:#e0e6f0; border:1px solid #4b5563; border-radius:4px; font-size:11px; }
+#tt-count { font-size:10px; color:#6b7280; margin-top:2px; text-align:center; }
+
+/* ── Play bar (bottom) ─────────────────────────────────────────────────── */
+#playbar { height:40px; background:#111827; border-top:1px solid #1f2937; display:flex; align-items:center; padding:0 14px; gap:10px; flex-shrink:0; }
+#play-btn { width:30px; height:30px; border-radius:50%; background:#3b82f6; border:none; cursor:pointer; font-size:13px; color:#fff; flex-shrink:0; }
+#timeline { flex:1; height:5px; background:#374151; border-radius:3px; cursor:pointer; position:relative; }
+#tl-fill { height:100%; background:#3b82f6; border-radius:3px; width:0%; pointer-events:none; }
+#time-lbl { font-size:11px; color:#9ca3af; white-space:nowrap; min-width:100px; text-align:right; }
+.spd { padding:3px 7px; font-size:11px; background:#374151; color:#9ca3af; border:1px solid #4b5563; border-radius:4px; cursor:pointer; }
+.spd.on { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+
+/* ── Empty/status messages ─────────────────────────────────────────────── */
+#empty-msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; pointer-events:none; }
+#empty-msg p { color:#6b7280; font-size:13px; }
+#status-msg { position:fixed; bottom:54px; left:14px; background:rgba(17,24,39,.9); border:1px solid #1f2937; padding:6px 10px; border-radius:6px; font-size:11px; color:#9ca3af; display:none; max-width:380px; line-height:1.4; z-index:50; }
+#status-msg.error { color:#fca5a5; border-color:#7f1d1d; }
+#status-msg.success { color:#86efac; border-color:#14532d; }
+
+/* ── Recording overlay ─────────────────────────────────────────────────── */
+#record-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75); display:none; align-items:center; justify-content:center; z-index:100; }
+.rec-box { background:#111827; border:1px solid #1f2937; border-radius:10px; padding:24px 32px; min-width:340px; text-align:center; box-shadow:0 8px 30px rgba(0,0,0,.6); }
+.rec-box h2 { color:#60a5fa; font-size:16px; margin-bottom:16px; }
+.rec-box .rec-progress { height:8px; background:#374151; border-radius:4px; margin:10px 0; overflow:hidden; }
+.rec-box #rec-bar { height:100%; background:linear-gradient(90deg, #3b82f6, #10b981); width:0%; transition:width 0.2s; }
+.rec-box p { font-size:12px; color:#9ca3af; margin:8px 0; }
+.rec-box button { margin-top:12px; background:#374151; color:#e0e6f0; }
+.rec-box .rec-dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#ef4444; margin-right:6px; animation:rec-pulse 1.2s infinite; vertical-align:middle; }
+@keyframes rec-pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+.tilt-row { display:flex; align-items:center; gap:5px; font-size:11px; color:#9ca3af; }
+.tilt-row input[type=range] { width:80px; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>⚽ Mesh Viewer</h1>
+  <button class="btn-blue" onclick="document.getElementById('fj').click()">Open Mesh JSON</button>
+  <input type="file" id="fj" accept=".json" onchange="loadMeshJson(this)" style="display:none">
+  <div class="sep"></div>
+  <label>Team A <input type="color" id="colA" value="#CC2222" onchange="applyTeamColors()"></label>
+  <label>Team B <input type="color" id="colB" value="#1144CC" onchange="applyTeamColors()"></label>
+  <div class="sep"></div>
+  <select onchange="setPreset(this.value)">
+    <option value="broadcast">Broadcast</option>
+    <option value="top">Bird's Eye</option>
+    <option value="sideline">Sideline</option>
+    <option value="corner">Corner</option>
+  </select>
+  <label><input type="checkbox" id="sw-wire" onchange="toggleWireframe(this.checked)"> Wireframe</label>
+  <label><input type="checkbox" id="sw-ids" checked onchange="toggleIds(this.checked)"> IDs</label>
+  <div class="tilt-row">
+    Tilt <input type="range" id="tilt" min="-90" max="90" value="0" oninput="setTilt(this.value)">
+    <span id="tilt-lbl">0°</span>
+  </div>
+  <div class="tilt-row">
+    Yaw <input type="range" id="yaw-off" min="-180" max="180" value="0" oninput="setYawOffset(this.value)">
+    <span id="yaw-off-lbl">0°</span>
+  </div>
+  <div class="sep"></div>
+  <button class="btn-red" id="btn-record" onclick="startRecording()" disabled>● Record MP4</button>
+  <span style="margin-left:auto;font-size:11px;color:#6b7280" id="info-lbl">no file loaded</span>
+</div>
+
+<div id="main">
+  <div id="three-panel">
+    <canvas id="c"></canvas>
+    <div id="cam-row">
+      <button class="cbtn" onclick="setPreset('top')">Bird's Eye</button>
+      <button class="cbtn" onclick="setPreset('broadcast')">Broadcast</button>
+      <button class="cbtn" onclick="setPreset('sideline')">Sideline</button>
+      <button class="cbtn" onclick="setPreset('corner')">Corner</button>
+    </div>
+
+    <div id="tactics-panel">
+      <div class="tt-title">Tactical Tools</div>
+      <button class="tt-btn active" data-tool="select" onclick="setTool('select')"><span class="tt-icon">↖</span> Select</button>
+      <button class="tt-btn" data-tool="arrow" onclick="setTool('arrow')"><span class="tt-icon">→</span> Arrow</button>
+      <button class="tt-btn" data-tool="line" onclick="setTool('line')"><span class="tt-icon">━</span> Line</button>
+      <button class="tt-btn" data-tool="path" onclick="setTool('path')"><span class="tt-icon">∿</span> Path</button>
+      <button class="tt-btn" data-tool="animpath" onclick="setTool('animpath')"><span class="tt-icon">⟿</span> Animated</button>
+      <hr>
+      <div class="tt-row">
+        <span>Color</span>
+        <input type="color" id="tt-color" value="#ff3030">
+      </div>
+      <div class="tt-row">
+        <span>Size</span>
+        <input type="range" id="tt-thick" min="1" max="10" value="4">
+      </div>
+      <div class="tt-row" id="tt-dur-row" style="display:none">
+        <span>Duration</span>
+        <input type="number" id="tt-dur" min="0.5" max="20" step="0.5" value="2.0">
+        <span style="font-size:10px">s</span>
+      </div>
+      <hr>
+      <button class="tt-btn" onclick="undoDrawing()"><span class="tt-icon">↶</span> Undo</button>
+      <button class="tt-btn" onclick="clearDrawings()"><span class="tt-icon">✕</span> Clear All</button>
+      <div id="tt-count">0 drawings</div>
+    </div>
+
+    <div id="hud">Frame <b id="h-frame">-</b> / <b id="h-total">-</b><br>Players <b id="h-players">0</b><br>Tracks <b id="h-tracks">0</b></div>
+    <div id="empty-msg">
+      <p>Open a *_mesh.json file (from lift_gvhmr.py with --verts fp16)</p>
+    </div>
+  </div>
+</div>
+
+<div id="playbar">
+  <button id="play-btn" onclick="togglePlay()">&#9654;</button>
+  <div id="timeline" onclick="seek(event)"><div id="tl-fill"></div></div>
+  <div style="display:flex;gap:4px">
+    <button class="spd on" onclick="setSpd(1,this)">1x</button>
+    <button class="spd" onclick="setSpd(2,this)">2x</button>
+    <button class="spd" onclick="setSpd(.5,this)">0.5x</button>
+  </div>
+  <span id="time-lbl">0/0</span>
+</div>
+
+<div id="status-msg"></div>
+
+<div id="record-overlay">
+  <div class="rec-box">
+    <h2><span class="rec-dot"></span><span id="rec-title">Recording…</span></h2>
+    <div class="rec-progress"><div id="rec-bar"></div></div>
+    <p id="rec-stage">Frame 0 / 0</p>
+    <p id="rec-detail" style="font-size:10px;color:#6b7280"></p>
+    <button onclick="cancelRecording()">Cancel</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Scene, renderer, camera. preserveDrawingBuffer:true so canvas.captureStream
+// can produce frames consistently across browsers.
+// ═══════════════════════════════════════════════════════════════════════════
+const canvas3d = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas:canvas3d, antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x0a0e1a);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0a0e1a, 100, 180);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
+camera.position.set(0, 35, 50);
+const ctrl = new THREE.OrbitControls(camera, canvas3d);
+ctrl.enableDamping = true; ctrl.dampingFactor = 0.07; ctrl.maxPolarAngle = Math.PI / 2.02;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const sun = new THREE.DirectionalLight(0xfff8e0, 1.0);
+sun.position.set(10, 30, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = sun.shadow.camera.bottom = -70;
+sun.shadow.camera.right = sun.shadow.camera.top = 70;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x3a5a2e, 0.15));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Pitch (rebuilt when JSON loads with metadata.pitch_width / pitch_height)
+// ═══════════════════════════════════════════════════════════════════════════
+let PW = 105, PH = 68;
+let pitchGroup = null;
+
+function wp(x, y) { return [x - PW / 2, y - PH / 2]; }
+function buildPitch() {
+  if (pitchGroup) scene.remove(pitchGroup);
+  pitchGroup = new THREE.Group();
+  pitchGroup.name = 'pitch';
+
+  for (let i = 0; i < 10; i++) {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(PW / 10, PH),
+      new THREE.MeshLambertMaterial({color: i % 2 ? 0x267026 : 0x2d7a2d})
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.receiveShadow = true;
+    m.position.set(-PW / 2 + PW / 20 + i * PW / 10, 0, 0);
+    pitchGroup.add(m);
+  }
+
+  const lm = new THREE.LineBasicMaterial({color: 0xffffff});
+  const ln = (pts) => pitchGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => new THREE.Vector3(x, .02, z))),
+    lm
+  ));
+  const rc = (cx, cz, w, h) => {
+    const hw = w / 2, hh = h / 2;
+    ln([[cx - hw, cz - hh], [cx + hw, cz - hh], [cx + hw, cz + hh], [cx - hw, cz + hh], [cx - hw, cz - hh]]);
+  };
+  const ci = (cx, cz, r) => {
+    const p = [];
+    for (let i = 0; i <= 64; i++) {
+      const a = i / 64 * Math.PI * 2;
+      p.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]);
+    }
+    ln(p);
+  };
+  const dt = (x, z) => {
+    const m = new THREE.Mesh(
+      new THREE.CircleGeometry(.3, 16),
+      new THREE.MeshBasicMaterial({color: 0xffffff})
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, .03, z);
+    pitchGroup.add(m);
+  };
+
+  const BOX_D = 16.5, BOX_W = 40.32, GBOX_D = 5.5, GBOX_W = 18.32, SPOT = 11, CIRC = 9.15;
+  ln([wp(0, 0), wp(PW, 0), wp(PW, PH), wp(0, PH), wp(0, 0)]);
+  ln([wp(PW / 2, 0), wp(PW / 2, PH)]);
+  ci(...wp(PW / 2, PH / 2), CIRC);
+  dt(...wp(PW / 2, PH / 2));
+  rc(...wp(BOX_D / 2, PH / 2), BOX_D, BOX_W);
+  rc(...wp(GBOX_D / 2, PH / 2), GBOX_D, GBOX_W);
+  dt(...wp(SPOT, PH / 2));
+  rc(...wp(PW - BOX_D / 2, PH / 2), BOX_D, BOX_W);
+  rc(...wp(PW - GBOX_D / 2, PH / 2), GBOX_D, GBOX_W);
+  dt(...wp(PW - SPOT, PH / 2));
+
+  scene.add(pitchGroup);
+}
+buildPitch();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Camera presets
+// ═══════════════════════════════════════════════════════════════════════════
+function setPreset(name) {
+  const p = {
+    broadcast: [0, 35, 50],
+    top:       [0, 95,  0],
+    sideline:  [0, 18, 55],
+    corner:    [55, 28, 40],
+  }[name] || [0, 35, 50];
+  camera.position.set(p[0], p[1], p[2]);
+  ctrl.target.set(0, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Base64 + float16 decoding (unchanged from original viewer)
+// ═══════════════════════════════════════════════════════════════════════════
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function f16toF32(h) {
+  const s = (h & 0x8000) >> 15, e = (h & 0x7C00) >> 10, f = h & 0x03FF;
+  if (e === 0) return (s ? -1 : 1) * Math.pow(2, -14) * (f / 1024);
+  if (e === 0x1F) return f ? NaN : (s ? -Infinity : Infinity);
+  return (s ? -1 : 1) * Math.pow(2, e - 15) * (1 + f / 1024);
+}
+function decodeVerts(b64, dtype) {
+  const bytes = b64ToBytes(b64);
+  if (dtype === 'fp16') {
+    const u16 = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+    const f32 = new Float32Array(u16.length);
+    for (let i = 0; i < u16.length; i++) f32[i] = f16toF32(u16[i]);
+    return f32;
+  }
+  if (dtype === 'fp32') {
+    if (bytes.byteOffset % 4 === 0) return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
+    const copy = new Uint8Array(bytes.byteLength); copy.set(bytes);
+    return new Float32Array(copy.buffer);
+  }
+  throw new Error('unknown verts dtype: ' + dtype);
+}
+function decodeFaces(b64) {
+  const bytes = b64ToBytes(b64);
+  if (bytes.byteOffset % 4 === 0) return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
+  const copy = new Uint8Array(bytes.byteLength); copy.set(bytes);
+  return new Uint32Array(copy.buffer);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mesh state
+// ═══════════════════════════════════════════════════════════════════════════
+let frames = [], metadata = null, facesIdx = null, vertsDtype = 'fp16';
+let totalFrames = 0, curFrame = 0, playing = false, spd = 1.0;
+let teamHexes = {A: '#CC2222', B: '#1144CC'};
+const trackRecs = {};
+const trackYaws = {};
+
+const YAW_VEL_WIN_FRAMES = 5;
+const YAW_VEL_THR = 0.04;
+const YAW_CALIB_TOP_K = 7;
+let yawOffsetRad = 0;
+let globalTiltDeg = 0;
+
+function computeTrackYaws() {
+  for (const k of Object.keys(trackYaws)) delete trackYaws[k];
+  const series = {};
+  for (const f of frames) {
+    const fi = f.frame_idx;
+    for (const p of (f.players || [])) {
+      if (!p.smplx) continue;
+      if (p.id === undefined || p.id < 0) continue;
+      if (!p.pitch_pos || p.pitch_pos.length !== 2) continue;
+      const gy = (typeof p.smplx.gvhmr_yaw === 'number') ? p.smplx.gvhmr_yaw : null;
+      if (!series[p.id]) series[p.id] = [];
+      series[p.id].push([fi, p.pitch_pos[0], p.pitch_pos[1], gy]);
+    }
+  }
+  for (const tidStr of Object.keys(series)) {
+    const arr = series[tidStr]; arr.sort((a, b) => a[0] - b[0]);
+    const N = arr.length;
+    const velYaws = new Array(N).fill(0), speeds = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) {
+      let dx = 0, dz = 0, n = 0;
+      const lo = Math.max(0, i - YAW_VEL_WIN_FRAMES), hi = Math.min(N - 2, i + YAW_VEL_WIN_FRAMES);
+      for (let k = lo; k <= hi; k++) { dx += arr[k + 1][1] - arr[k][1]; dz += arr[k + 1][2] - arr[k][2]; n++; }
+      if (n > 0) { dx /= n; dz /= n; }
+      velYaws[i] = Math.atan2(dx, dz); speeds[i] = Math.sqrt(dx * dx + dz * dz);
+    }
+    const hasGvhmrYaw = arr.some(r => r[3] !== null);
+    const yawMap = {};
+    if (!hasGvhmrYaw) {
+      let lastYaw = null;
+      for (let i = 0; i < N; i++) {
+        let yaw = (speeds[i] > YAW_VEL_THR) ? velYaws[i] : (lastYaw !== null ? lastYaw : 0);
+        yawMap[arr[i][0]] = yaw; lastYaw = yaw;
+      }
+      trackYaws[tidStr] = yawMap; continue;
+    }
+    const candidates = [];
+    for (let i = 0; i < N; i++) {
+      if (arr[i][3] === null) continue;
+      if (speeds[i] < YAW_VEL_THR) continue;
+      candidates.push([speeds[i], i]);
+    }
+    candidates.sort((a, b) => b[0] - a[0]);
+    let C = 0;
+    if (candidates.length > 0) {
+      const K = Math.min(YAW_CALIB_TOP_K, candidates.length);
+      let cosSum = 0, sinSum = 0;
+      for (let k = 0; k < K; k++) {
+        const i = candidates[k][1]; const delta = velYaws[i] - arr[i][3];
+        cosSum += Math.cos(delta); sinSum += Math.sin(delta);
+      }
+      C = Math.atan2(sinSum, cosSum);
+    }
+    let lastYaw = 0;
+    for (let i = 0; i < N; i++) {
+      let yaw;
+      if (arr[i][3] !== null) {
+        yaw = arr[i][3] + C;
+        while (yaw > Math.PI) yaw -= 2 * Math.PI;
+        while (yaw < -Math.PI) yaw += 2 * Math.PI;
+      } else yaw = lastYaw;
+      yawMap[arr[i][0]] = yaw; lastYaw = yaw;
+    }
+    trackYaws[tidStr] = yawMap;
+  }
+}
+
+function makeLabel(text) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 64;
+  const cx = cv.getContext('2d');
+  cx.fillStyle = 'rgba(17,24,39,.92)';
+  cx.fillRect(64, 8, 128, 48);
+  cx.fillStyle = '#fff';
+  cx.font = 'bold 28px sans-serif';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText(text, 128, 32);
+  const tex = new THREE.CanvasTexture(cv);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: tex, depthTest: false}));
+  sprite.scale.set(2.0, 0.5, 1);
+  return sprite;
+}
+function teamColor(teamIdx) {
+  if (teamIdx === 0) return new THREE.Color(teamHexes.A);
+  if (teamIdx === 1) return new THREE.Color(teamHexes.B);
+  return new THREE.Color(0x888888);
+}
+function clearMeshes() {
+  for (const tid of Object.keys(trackRecs)) {
+    scene.remove(trackRecs[tid].mesh);
+    if (trackRecs[tid].label) scene.remove(trackRecs[tid].label);
+    trackRecs[tid].mesh.geometry.dispose();
+    trackRecs[tid].mesh.material.dispose();
+  }
+  for (const k of Object.keys(trackRecs)) delete trackRecs[k];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TACTICAL DRAWING LAYER
+//
+// Four primitive types, all drawn on the pitch plane at Y=0.05 to avoid
+// z-fighting with the grass. All are interactive: click-drag with the mouse
+// while a tool is selected, finalises on mouse-up. Drawings persist across
+// frames (default), or animate from a start frame for the 'animpath' type.
+//
+// Storage shape per drawing:
+//   { id, type, points: [[x,z],...], color, thickness, duration?, startFrame? }
+// The Three.js objects are stored separately in `obj` so we can rebuild
+// (e.g. on colour change) without serialising mesh data.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const drawings = [];           // persisted state
+const drawingObjects = {};     // id → { meshes: [Mesh], totalIndices }
+let currentTool = 'select';    // 'select' | 'arrow' | 'line' | 'path' | 'animpath'
+let drawingInProgress = null;  // { type, points, previewObj }
+
+const raycaster = new THREE.Raycaster();
+const pitchPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+function mouseToPitchPoint(event) {
+  const rect = canvas3d.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  raycaster.setFromCamera(mouse, camera);
+  const hit = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(pitchPlane, hit)) return null;
+  // Clamp to a generous bound around the pitch so accidental clicks behind
+  // the camera or above the horizon don't produce wild outliers.
+  if (Math.abs(hit.x) > PW || Math.abs(hit.z) > PH) return null;
+  return [hit.x, hit.z];
+}
+
+function setTool(tool) {
+  currentTool = tool;
+  document.querySelectorAll('.tt-btn[data-tool]').forEach(b => {
+    b.classList.toggle('active', b.dataset.tool === tool);
+  });
+  document.getElementById('tt-dur-row').style.display =
+    (tool === 'animpath') ? 'flex' : 'none';
+  // Orbit controls run only in 'select' mode; drawing tools take over
+  // pointer input on the canvas.
+  ctrl.enabled = (tool === 'select');
+  // Cursor hint
+  canvas3d.style.cursor = (tool === 'select') ? '' : 'crosshair';
+}
+
+function buildLineSegmentGeometry(points, thickness) {
+  // points: list of [x, z] in centred pitch coords. Returns a single
+  // TubeGeometry following the polyline at Y=0.05.
+  if (points.length < 2) return null;
+  const v3 = points.map(p => new THREE.Vector3(p[0], 0.05, p[1]));
+  // CatmullRom gives a smooth curve; tension 0 keeps it close to the points.
+  const curve = (points.length === 2)
+    ? new THREE.LineCurve3(v3[0], v3[1])
+    : new THREE.CatmullRomCurve3(v3, false, 'catmullrom', 0.1);
+  // Tubular segments scale with point count for path/animpath
+  const tubularSegs = Math.max(8, Math.min(256, points.length * 8));
+  return new THREE.TubeGeometry(curve, tubularSegs, thickness, 8, false);
+}
+
+function buildArrowHead(start, end, thickness, color) {
+  // Cone at `end`, oriented along (end - start). Returns a Mesh.
+  const dir = new THREE.Vector3(end[0] - start[0], 0, end[1] - start[1]);
+  const len = dir.length();
+  if (len < 1e-4) return null;
+  dir.normalize();
+  const headLen = Math.max(thickness * 4, 0.8);
+  const headRad = Math.max(thickness * 2.5, 0.5);
+  const geom = new THREE.ConeGeometry(headRad, headLen, 16);
+  const mat = new THREE.MeshLambertMaterial({color});
+  const mesh = new THREE.Mesh(geom, mat);
+  // Cone defaults pointing +Y; rotate so +Y aligns with `dir` (which is in XZ plane)
+  const up = new THREE.Vector3(0, 1, 0);
+  const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
+  mesh.quaternion.copy(quat);
+  // Position the cone so its base sits at `end`, tip extends beyond
+  mesh.position.set(
+    end[0] + dir.x * (headLen / 2 - thickness),
+    0.05,
+    end[1] + dir.z * (headLen / 2 - thickness),
+  );
+  mesh.castShadow = false;
+  return mesh;
+}
+
+function instantiateDrawing(d) {
+  // Build and add the Three.js objects for one drawing. Returns the record.
+  const color = new THREE.Color(d.color);
+  const mat = new THREE.MeshLambertMaterial({color, side: THREE.DoubleSide});
+  const meshes = [];
+  let totalIndices = 0;
+
+  const tubeGeom = buildLineSegmentGeometry(d.points, d.thickness);
+  if (tubeGeom) {
+    const tube = new THREE.Mesh(tubeGeom, mat);
+    tube.castShadow = false;
+    tube.receiveShadow = false;
+    scene.add(tube);
+    meshes.push(tube);
+    totalIndices = tubeGeom.index ? tubeGeom.index.count : 0;
+  }
+
+  if (d.type === 'arrow' && d.points.length >= 2) {
+    const head = buildArrowHead(
+      d.points[d.points.length - 2],
+      d.points[d.points.length - 1],
+      d.thickness,
+      color,
+    );
+    if (head) { scene.add(head); meshes.push(head); }
+  }
+
+  drawingObjects[d.id] = {meshes, totalIndices, material: mat};
+}
+
+function removeDrawingObjects(id) {
+  const rec = drawingObjects[id];
+  if (!rec) return;
+  for (const m of rec.meshes) {
+    scene.remove(m);
+    if (m.geometry) m.geometry.dispose();
+  }
+  if (rec.material) rec.material.dispose();
+  delete drawingObjects[id];
+}
+
+function rebuildAllDrawings() {
+  for (const id of Object.keys(drawingObjects)) removeDrawingObjects(id);
+  for (const d of drawings) instantiateDrawing(d);
+  updateDrawingCountUI();
+}
+
+function updateDrawingCountUI() {
+  document.getElementById('tt-count').textContent =
+    drawings.length + ' drawing' + (drawings.length === 1 ? '' : 's');
+}
+
+function addDrawing(type, points) {
+  if (points.length < 2) return;
+  const color = document.getElementById('tt-color').value;
+  const thicknessSlider = parseInt(document.getElementById('tt-thick').value, 10);
+  // Map 1-10 to 0.05-0.5 metres
+  const thickness = 0.05 + (thicknessSlider - 1) / 9 * 0.45;
+  const d = {
+    id: 'd' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    type, points, color, thickness,
+  };
+  if (type === 'animpath') {
+    d.duration = parseFloat(document.getElementById('tt-dur').value) || 2.0;
+    d.startFrame = curFrame;
+  }
+  drawings.push(d);
+  instantiateDrawing(d);
+  updateAnimatedDrawings(curFrame);
+  updateDrawingCountUI();
+}
+
+function undoDrawing() {
+  if (drawings.length === 0) return;
+  const d = drawings.pop();
+  removeDrawingObjects(d.id);
+  updateDrawingCountUI();
+}
+
+function clearDrawings() {
+  if (drawings.length === 0) return;
+  if (!confirm('Remove all ' + drawings.length + ' drawing(s)?')) return;
+  for (const id of Object.keys(drawingObjects)) removeDrawingObjects(id);
+  drawings.length = 0;
+  updateDrawingCountUI();
+}
+
+function updateAnimatedDrawings(frame) {
+  // For each animated path: compute progress 0..1 based on (frame - startFrame)
+  // and the duration in frames. Use BufferGeometry.setDrawRange to reveal the
+  // tube progressively without rebuilding geometry per frame.
+  const fps = (metadata && metadata.playback_fps) || 25;
+  for (const d of drawings) {
+    if (d.type !== 'animpath') continue;
+    const rec = drawingObjects[d.id];
+    if (!rec || rec.meshes.length === 0) continue;
+    const durFrames = Math.max(1, Math.round(d.duration * fps));
+    let progress;
+    if (frame < d.startFrame) progress = 0;
+    else if (frame >= d.startFrame + durFrames) progress = 1;
+    else progress = (frame - d.startFrame) / durFrames;
+    const tubeMesh = rec.meshes[0];
+    if (tubeMesh && tubeMesh.geometry && tubeMesh.geometry.index) {
+      const visible = Math.floor(rec.totalIndices * progress);
+      tubeMesh.geometry.setDrawRange(0, visible);
+    }
+    // Hide the mesh entirely before its start frame so it doesn't pop in
+    tubeMesh.visible = (frame >= d.startFrame);
+  }
+}
+
+// ── Mouse / pointer handling ────────────────────────────────────────────
+let pointerDown = false;
+canvas3d.addEventListener('pointerdown', (e) => {
+  if (currentTool === 'select') return;
+  if (!totalFrames) { showStatus('Open a mesh JSON first', true); return; }
+  e.preventDefault();
+  const pt = mouseToPitchPoint(e);
+  if (!pt) return;
+  pointerDown = true;
+  drawingInProgress = {type: currentTool, points: [pt], previewObj: null};
+});
+
+canvas3d.addEventListener('pointermove', (e) => {
+  if (!pointerDown || !drawingInProgress) return;
+  e.preventDefault();
+  const pt = mouseToPitchPoint(e);
+  if (!pt) return;
+  const dip = drawingInProgress;
+  if (dip.type === 'path' || dip.type === 'animpath') {
+    // Sample with a minimum distance to avoid clogging the curve with
+    // thousands of near-identical points on a fast drag.
+    const last = dip.points[dip.points.length - 1];
+    const dx = pt[0] - last[0], dz = pt[1] - last[1];
+    if (dx * dx + dz * dz < 0.04) return; // ~0.2m minimum step
+    dip.points.push(pt);
+  } else {
+    // arrow / line: keep just the start + current end for preview
+    dip.points = [dip.points[0], pt];
+  }
+  // Live preview: tear down + rebuild a temp mesh. Fast enough at these sizes.
+  if (dip.previewObj) {
+    scene.remove(dip.previewObj);
+    if (dip.previewObj.geometry) dip.previewObj.geometry.dispose();
+    if (dip.previewObj.material) dip.previewObj.material.dispose();
+    dip.previewObj = null;
+  }
+  if (dip.points.length >= 2) {
+    const colorHex = document.getElementById('tt-color').value;
+    const thicknessSlider = parseInt(document.getElementById('tt-thick').value, 10);
+    const thickness = 0.05 + (thicknessSlider - 1) / 9 * 0.45;
+    const geom = buildLineSegmentGeometry(dip.points, thickness);
+    if (geom) {
+      const mat = new THREE.MeshBasicMaterial({color: new THREE.Color(colorHex), transparent: true, opacity: 0.7});
+      const mesh = new THREE.Mesh(geom, mat);
+      scene.add(mesh);
+      dip.previewObj = mesh;
+    }
+  }
+});
+
+canvas3d.addEventListener('pointerup', (e) => {
+  if (!pointerDown || !drawingInProgress) { pointerDown = false; return; }
+  e.preventDefault();
+  pointerDown = false;
+  // Clean up the preview
+  if (drawingInProgress.previewObj) {
+    scene.remove(drawingInProgress.previewObj);
+    if (drawingInProgress.previewObj.geometry) drawingInProgress.previewObj.geometry.dispose();
+    if (drawingInProgress.previewObj.material) drawingInProgress.previewObj.material.dispose();
+  }
+  if (drawingInProgress.points.length >= 2) {
+    addDrawing(drawingInProgress.type, drawingInProgress.points);
+  }
+  drawingInProgress = null;
+});
+
+canvas3d.addEventListener('pointercancel', () => {
+  if (drawingInProgress && drawingInProgress.previewObj) {
+    scene.remove(drawingInProgress.previewObj);
+    if (drawingInProgress.previewObj.geometry) drawingInProgress.previewObj.geometry.dispose();
+    if (drawingInProgress.previewObj.material) drawingInProgress.previewObj.material.dispose();
+  }
+  drawingInProgress = null; pointerDown = false;
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// JSON loading (unchanged behaviour, plus enable the Record button on success)
+// ═══════════════════════════════════════════════════════════════════════════
+function showStatus(msg, kind) {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = (kind === true || kind === 'error') ? 'error'
+    : (kind === 'success') ? 'success' : '';
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function loadMeshJson(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  document.getElementById('empty-msg').style.display = 'none';
+  showStatus('Reading JSON…', false);
+  const reader = new FileReader();
+  reader.onerror = () => showStatus('Failed to read file', true);
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      ingestData(data, file.name);
+    } catch (err) { showStatus('JSON parse error: ' + err.message, true); }
+  };
+  reader.readAsText(file);
+}
+
+function ingestData(data, fname) {
+  metadata = data.metadata || {};
+  const sm = metadata.smplx || {};
+  if (!sm.faces_b64) {
+    showStatus(
+      'This JSON has SMPL-X params but no precomputed vertices. ' +
+      'Re-run: python lift_gvhmr.py <result.json> --verts fp16', true);
+    return;
+  }
+  vertsDtype = sm.verts_dtype || 'fp16';
+  facesIdx = decodeFaces(sm.faces_b64);
+  PW = metadata.pitch_width || 105;
+  PH = metadata.pitch_height || 68;
+  buildPitch();
+  frames = data.frames || [];
+  totalFrames = frames.length;
+  if (metadata.teams && Array.isArray(metadata.teams.kit_colors)) {
+    const kc = metadata.teams.kit_colors;
+    if (kc[0]) { teamHexes.A = kc[0]; document.getElementById('colA').value = kc[0]; }
+    if (kc[1]) { teamHexes.B = kc[1]; document.getElementById('colB').value = kc[1]; }
+  }
+  const trackTeams = {};
+  for (const f of frames) {
+    for (const p of (f.players || [])) {
+      if (p.smplx && p.smplx.verts_b64 != null && p.id !== undefined && p.id >= 0) {
+        if (p.team !== undefined && p.team !== null) trackTeams[p.id] = p.team;
+        else if (!(p.id in trackTeams)) trackTeams[p.id] = -1;
+      }
+    }
+  }
+  clearMeshes();
+  for (const tidStr of Object.keys(trackTeams)) {
+    const tid = +tidStr, team = trackTeams[tidStr];
+    const NV = sm.num_verts || 10475;
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NV * 3), 3));
+    geom.setIndex(new THREE.BufferAttribute(facesIdx, 1));
+    const mat = new THREE.MeshLambertMaterial({
+      color: teamColor(team), side: THREE.DoubleSide,
+      wireframe: document.getElementById('sw-wire').checked,
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh.visible = false;
+    scene.add(mesh);
+    const label = makeLabel('#' + tid); label.visible = false; scene.add(label);
+    trackRecs[tid] = {mesh, team, label};
+  }
+  computeTrackYaws();
+  // Drawings carry over across loads — user might want the same tactics on
+  // a different clip. Rebuild them for the (possibly new) pitch dimensions.
+  rebuildAllDrawings();
+
+  showStatus(
+    `Loaded ${fname}: ${Object.keys(trackRecs).length} tracks, ` +
+    `${totalFrames} frames, verts=${vertsDtype}`, 'success');
+  document.getElementById('info-lbl').textContent =
+    `${fname} — ${Object.keys(trackRecs).length} tracks`;
+  document.getElementById('h-tracks').textContent = Object.keys(trackRecs).length;
+  document.getElementById('btn-record').disabled = false;
+  curFrame = 0; updateFrame(0);
+  setTimeout(() => showStatus('', false), 4000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Per-frame update
+// ═══════════════════════════════════════════════════════════════════════════
+function updateFrame(idx) {
+  if (totalFrames === 0) return;
+  curFrame = Math.max(0, Math.min(idx, totalFrames - 1));
+  const f = frames[curFrame];
+  if (!f) return;
+  for (const tid of Object.keys(trackRecs)) {
+    trackRecs[tid].mesh.visible = false;
+    if (trackRecs[tid].label) trackRecs[tid].label.visible = false;
+  }
+  let visibleCount = 0;
+  const tiltRad = globalTiltDeg * Math.PI / 180;
+  for (const p of (f.players || [])) {
+    if (!p.smplx || !p.smplx.verts_b64) continue;
+    const tr = trackRecs[p.id];
+    if (!tr) continue;
+    const verts = decodeVerts(p.smplx.verts_b64, vertsDtype);
+    const posAttr = tr.mesh.geometry.getAttribute('position');
+    posAttr.array.set(verts);
+    posAttr.needsUpdate = true;
+    tr.mesh.geometry.computeVertexNormals();
+    tr.mesh.geometry.computeBoundingSphere();
+    let x = 0, z = 0;
+    if (p.pitch_pos && p.pitch_pos.length === 2) {
+      x = p.pitch_pos[0] - PW / 2; z = p.pitch_pos[1] - PH / 2;
+    }
+    tr.mesh.position.set(x, 0, z);
+    const yawMap = trackYaws[p.id];
+    const baseYaw = (yawMap && yawMap[f.frame_idx] !== undefined) ? yawMap[f.frame_idx] : 0;
+    tr.mesh.rotation.set(tiltRad, baseYaw + yawOffsetRad, 0);
+    tr.mesh.visible = true;
+    if (tr.label) {
+      tr.label.position.set(x, 2.4, z);
+      tr.label.visible = document.getElementById('sw-ids').checked;
+    }
+    visibleCount++;
+  }
+  updateAnimatedDrawings(curFrame);
+  document.getElementById('h-frame').textContent = curFrame + 1;
+  document.getElementById('h-total').textContent = totalFrames;
+  document.getElementById('h-players').textContent = visibleCount;
+  document.getElementById('tl-fill').style.width = (100 * curFrame / Math.max(1, totalFrames - 1)) + '%';
+  document.getElementById('time-lbl').textContent = (curFrame + 1) + ' / ' + totalFrames;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Playback
+// ═══════════════════════════════════════════════════════════════════════════
+function togglePlay() {
+  if (totalFrames === 0) return;
+  playing = !playing;
+  if (playing && curFrame >= totalFrames - 1) curFrame = 0;
+  document.getElementById('play-btn').innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
+}
+function setSpd(s, btn) {
+  spd = s;
+  document.querySelectorAll('.spd').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+function seek(ev) {
+  if (totalFrames === 0) return;
+  const rect = document.getElementById('timeline').getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+  updateFrame(Math.round(frac * (totalFrames - 1)));
+}
+function applyTeamColors() {
+  teamHexes.A = document.getElementById('colA').value;
+  teamHexes.B = document.getElementById('colB').value;
+  for (const tid of Object.keys(trackRecs)) {
+    trackRecs[tid].mesh.material.color = teamColor(trackRecs[tid].team);
+    trackRecs[tid].mesh.material.needsUpdate = true;
+  }
+}
+function toggleWireframe(on) {
+  for (const tid of Object.keys(trackRecs)) {
+    trackRecs[tid].mesh.material.wireframe = on;
+    trackRecs[tid].mesh.material.needsUpdate = true;
+  }
+}
+function toggleIds(on) {
+  for (const tid of Object.keys(trackRecs)) {
+    if (trackRecs[tid].label) trackRecs[tid].label.visible = on && trackRecs[tid].mesh.visible;
+  }
+}
+function setTilt(deg) {
+  globalTiltDeg = Number(deg);
+  document.getElementById('tilt-lbl').textContent = globalTiltDeg + '°';
+  updateFrame(curFrame);
+}
+function setYawOffset(deg) {
+  yawOffsetRad = Number(deg) * Math.PI / 180;
+  document.getElementById('yaw-off-lbl').textContent = Number(deg) + '°';
+  updateFrame(curFrame);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RECORDING + MP4 EXPORT
+//
+// Pipeline:
+//   1) Pick the best supported WebM codec (VP9 preferred, VP8 fallback).
+//   2) Use canvas.captureStream(fps) so the recorder samples the canvas at
+//      the source playback fps. Realtime capture — total duration matches
+//      the source clip length.
+//   3) Drive playback via setTimeout at the same fps, rendering each frame
+//      through the main RAF loop (which guarantees the canvas is up to date
+//      by the next capture sample).
+//   4) On stop: bundle chunks into a Blob, POST to /transcode-to-mp4 on
+//      the FastAPI server, server transcodes via ffmpeg (libx264), returns
+//      MP4 bytes. We hand the user a download link.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const recordingState = {
+  active: false, recorder: null, chunks: [], cancelled: false,
+};
+
+function pickMimeType() {
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  for (const m of candidates) {
+    if (typeof MediaRecorder !== 'undefined' &&
+        MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return null;
+}
+
+function showRecordOverlay(show) {
+  document.getElementById('record-overlay').style.display = show ? 'flex' : 'none';
+}
+function setRecordProgress(pct, stage, detail) {
+  document.getElementById('rec-bar').style.width = pct + '%';
+  if (stage !== undefined) document.getElementById('rec-stage').textContent = stage;
+  if (detail !== undefined) document.getElementById('rec-detail').textContent = detail;
+}
+function setRecordTitle(t) { document.getElementById('rec-title').textContent = t; }
+
+async function startRecording() {
+  if (recordingState.active) return;
+  if (!totalFrames) { showStatus('Open a mesh JSON first', true); return; }
+  if (typeof MediaRecorder === 'undefined') {
+    showStatus('Your browser does not support MediaRecorder.', true); return;
+  }
+  const mimeType = pickMimeType();
+  if (!mimeType) {
+    showStatus('No supported WebM codec found in this browser.', true); return;
+  }
+
+  // Pause normal playback (we drive frames ourselves during recording)
+  playing = false;
+  document.getElementById('play-btn').innerHTML = '&#9654;';
+
+  // Build the stream
+  const fps = Math.max(1, Math.round((metadata && metadata.playback_fps) || 25));
+  let stream;
+  try {
+    stream = canvas3d.captureStream(fps);
+  } catch (err) {
+    showStatus('Canvas capture is not supported here: ' + err.message, true);
+    return;
+  }
+
+  recordingState.active = true;
+  recordingState.cancelled = false;
+  recordingState.chunks = [];
+
+  let recorder;
+  try {
+    recorder = new MediaRecorder(stream, {
+      mimeType, videoBitsPerSecond: 6_000_000,
+    });
+  } catch (err) {
+    recordingState.active = false;
+    showStatus('MediaRecorder creation failed: ' + err.message, true);
+    return;
+  }
+  recordingState.recorder = recorder;
+
+  recorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) recordingState.chunks.push(e.data);
+  };
+  recorder.onerror = (e) => {
+    console.error('MediaRecorder error:', e);
+    showStatus('Recording error — check console.', true);
+  };
+
+  showRecordOverlay(true);
+  setRecordTitle('Recording…');
+  setRecordProgress(0, 'Frame 0 / ' + totalFrames, mimeType);
+
+  recorder.start(1000);  // emit a chunk every second so memory stays bounded
+
+  document.body.classList.add('recording');
+
+  // Drive playback at fps using setTimeout. We don't call renderer.render here
+  // because the RAF loop is already running and will render the frame we just
+  // set. captureStream(fps) samples whatever is currently on the canvas at
+  // each fps tick.
+  const frameDurMs = 1000 / fps;
+  let frame = 0;
+  const tStart = performance.now();
+
+  await new Promise((resolve) => {
+    function tick() {
+      if (recordingState.cancelled) { resolve(); return; }
+      if (frame >= totalFrames) { resolve(); return; }
+      updateFrame(frame);
+      const pct = Math.round(100 * frame / totalFrames);
+      setRecordProgress(pct, `Frame ${frame + 1} / ${totalFrames}`,
+        `${fps} fps • ${mimeType}`);
+      frame++;
+      // Schedule next frame to keep wall-clock alignment with real fps
+      const expected = tStart + frame * frameDurMs;
+      const delay = Math.max(0, expected - performance.now());
+      setTimeout(tick, delay);
+    }
+    tick();
+  });
+
+  // Allow a final flush before stopping
+  await new Promise(r => setTimeout(r, 400));
+
+  // Stop and wait for the final chunk
+  const stopped = new Promise((resolve) => { recorder.onstop = () => resolve(); });
+  try { recorder.stop(); } catch (e) { /* already stopped */ }
+  await stopped;
+
+  document.body.classList.remove('recording');
+  // Release the capture tracks so the camera/MIC indicator stops where
+  // applicable (canvas captureStream tracks are not strictly that, but it's
+  // good hygiene).
+  try { stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+
+  recordingState.recorder = null;
+  recordingState.active = false;
+
+  if (recordingState.cancelled) {
+    showRecordOverlay(false);
+    showStatus('Recording cancelled.', false);
+    return;
+  }
+
+  // Build the Blob and ship it to the server for transcoding
+  const blob = new Blob(recordingState.chunks, {type: mimeType});
+  recordingState.chunks = [];
+
+  setRecordTitle('Transcoding to MP4…');
+  setRecordProgress(0, 'Uploading to server…', `WebM size: ${(blob.size / 1024 / 1024).toFixed(1)} MB`);
+
+  try {
+    const mp4Url = await uploadAndTranscode(blob, mimeType);
+    setRecordProgress(100, 'Done — your download is ready', '');
+    setRecordTitle('Ready');
+    // Auto-trigger download
+    const a = document.createElement('a');
+    a.href = mp4Url;
+    a.download = 'tactical_analysis.mp4';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => { showRecordOverlay(false); }, 1500);
+    showStatus('MP4 download started.', 'success');
+  } catch (err) {
+    setRecordTitle('Transcode failed');
+    setRecordProgress(0, err.message || 'Unknown error',
+      'You can still download the raw WebM below.');
+    // Offer the WebM as a fallback so the recording isn't lost
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tactical_analysis.webm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    showStatus('Server transcode failed. WebM downloaded instead.', true);
+  }
+}
+
+function cancelRecording() {
+  if (!recordingState.active && document.getElementById('record-overlay').style.display === 'flex') {
+    // We're past the recording phase (transcoding). Just hide.
+    showRecordOverlay(false);
+    return;
+  }
+  recordingState.cancelled = true;
+  if (recordingState.recorder && recordingState.recorder.state !== 'inactive') {
+    try { recordingState.recorder.stop(); } catch (_) {}
+  }
+}
+
+async function uploadAndTranscode(blob, mimeType) {
+  // POST the WebM blob to the server, expect an MP4 file back. We use
+  // fetch's streaming response to avoid loading the MP4 into memory twice.
+  const form = new FormData();
+  // Filename gives the server a hint about the upload format
+  form.append('video', blob, 'recording.webm');
+  form.append('mime_type', mimeType);
+
+  let resp;
+  try {
+    resp = await fetch('/transcode-to-mp4', {method: 'POST', body: form});
+  } catch (err) {
+    throw new Error('Network error: ' + err.message);
+  }
+  if (!resp.ok) {
+    let detail = '';
+    try { detail = await resp.text(); } catch (_) {}
+    throw new Error('Server returned ' + resp.status + ': ' + (detail || resp.statusText).slice(0, 200));
+  }
+  const mp4Blob = await resp.blob();
+  if (mp4Blob.size === 0) throw new Error('Server returned an empty MP4');
+  return URL.createObjectURL(mp4Blob);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Resize + main render loop
+// ═══════════════════════════════════════════════════════════════════════════
+function resize() {
+  const panel = document.getElementById('three-panel');
+  const w = panel.clientWidth, h = panel.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+let last = performance.now();
+function tick(t) {
+  requestAnimationFrame(tick);
+  if (currentTool === 'select') ctrl.update();
+  // Normal playback — disabled while a recording loop is driving updateFrame
+  if (playing && totalFrames > 0 && !recordingState.active) {
+    const fps = (metadata && metadata.playback_fps) || 30;
+    const dt = (t - last) / 1000;
+    const advance = dt * fps * spd;
+    if (advance >= 1) {
+      last = t;
+      const next = curFrame + Math.floor(advance);
+      if (next >= totalFrames - 1) {
+        updateFrame(totalFrames - 1);
+        playing = false;
+        document.getElementById('play-btn').innerHTML = '&#9654;';
+      } else updateFrame(next);
+    }
+  } else last = t;
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(tick);
+
+// Keyboard: space=play, ←/→=step. Disabled while drawing or recording.
+window.addEventListener('keydown', (e) => {
+  if (recordingState.active) return;
+  if (drawingInProgress) return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  else if (e.code === 'ArrowRight') updateFrame(curFrame + 1);
+  else if (e.code === 'ArrowLeft') updateFrame(curFrame - 1);
+});
+</script>
+</body>
+</html>

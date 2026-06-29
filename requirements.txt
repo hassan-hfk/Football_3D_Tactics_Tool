@@ -1,0 +1,77 @@
+###############################################################################
+# FORMA 3D — Football 3D Tactics Tool
+# Python dependencies
+#
+# Covers: FastAPI server, YOLO detection + BoT-SORT tracking, PnLCalib
+# homography (HRNet-W48), ViTPose-B (ONNX), GVHMR SMPL-X mesh lifting,
+# and ffmpeg-based MP4 export.
+#
+# Install:
+#   pip install -r requirements.txt
+#
+# Do NOT use the requirements.txt files inside PnLCalib/, MotionBERT/, or
+# research/GVHMR/ — those pin Linux/CUDA-only wheels and will fail on
+# Windows/macOS.
+#
+# pytorch3d is NOT listed here because it cannot be pip-installed on most
+# setups. See SETUP.md for the full build instructions.
+###############################################################################
+
+# ── Server ────────────────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+python-multipart
+
+# ── Core ──────────────────────────────────────────────────────────────────────
+numpy
+opencv-python
+scipy
+pyyaml
+easydict
+shapely
+matplotlib
+
+# ── Detection / tracking (YOLO + BoT-SORT) ────────────────────────────────────
+ultralytics
+
+# ── Team clustering (ResNet-26 embeddings) ────────────────────────────────────
+transformers
+
+# ── PyTorch ────────────────────────────────────────────────────────────────────
+# Plain PyPI build ships with MPS support on macOS and CPU everywhere.
+# For CUDA on Linux/Windows, install torch first from https://pytorch.org
+# with the correct CUDA index, then rerun this file.
+torch
+torchvision
+
+# ── Pose (ViTPose-B ONNX) ─────────────────────────────────────────────────────
+onnxruntime
+
+# ── Video I/O + MP4 export ────────────────────────────────────────────────────
+imageio[ffmpeg]        # video frame reader (FrameCache in lift_gvhmr.py)
+av                     # imageio's fast pyav backend
+imageio-ffmpeg         # bundled ffmpeg binary used by /transcode-to-mp4 endpoint
+ffmpeg-python          # GVHMR imports this (NOT the bare `ffmpeg` package)
+
+# ── GVHMR / SMPL-X mesh lifting ───────────────────────────────────────────────
+smplx                  # SMPL-X body model forward pass
+einops                 # tensor reshaping used by GVHMR's transformer
+hydra-core             # GVHMR's config system
+omegaconf              # dependency of hydra-core
+lightning              # GVHMR wraps its model as a LightningModule
+pytorch-lightning      # alias kept for older import paths
+timm                   # HMR2 ViT backbone
+colorlog               # logging dependency pulled in by GVHMR / hydra
+hydra-zen              # used by some GVHMR config helpers
+wis3d                  # lightweight 3D visualisation used by GVHMR utilities
+chumpy                 # SMPL serialisation legacy dependency
+
+# ── pytorch3d — must be built from source on most setups ──────────────────────
+# See SETUP.md "Step 5 — pytorch3d" for the full instructions.
+# Quick reference (run AFTER the rest of this file is installed):
+#
+#   pip install fvcore iopath ninja
+#   MAX_JOBS=4 pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable"
+#
+# Pre-built wheels for Windows are sometimes available at:
+#   https://github.com/facebookresearch/pytorch3d/releases

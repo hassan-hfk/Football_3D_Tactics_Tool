@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Model weights — download separately, see docs/SETUP.md
+models/*.pt
+models/*.onnx
+models/*.mlpackage
+models/SV_kp
+models/SV_lines
+yolo26n-cls.pt
+
+# Pipeline outputs
+outputs/
+uploads/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Env / secrets
+.env
+*.env
+
+# Archives
+*.zip
+*.tar.gz
+
+# PnLCalib large sample files
+PnLCalib/sample*.mp4
+PnLCalib/examples/
+
+# MotionBERT downloads
+MotionBERT/checkpoints/
+MotionBERT/data/
+
+# GVHMR checkpoints
+GVHMR/inputs/
+research/GVHMR/inputs/
+
+# Backup and temp
+*.bak
+*.tmp
+*.log
+
+# Office docs (use Markdown in docs/ instead)
+*.docx
+*.xlsx
+*.pptx
+
+CHANGES.txt
+research/

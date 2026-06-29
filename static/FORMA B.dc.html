@@ -1,0 +1,2692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FORMA 3D — Football Tactics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:#0f172a;color:#e2e8f0;font-family:'Sora',system-ui,sans-serif;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:#1e293b;}::-webkit-scrollbar-thumb{background:#334155;border-radius:2px;}
+.tab-btn{height:52px;padding:0 22px;background:transparent;border:none;border-bottom:2px solid transparent;color:#475569;font-family:'Sora',system-ui,sans-serif;font-size:11px;font-weight:600;letter-spacing:.1em;cursor:pointer;transition:color .15s,border-color .15s;white-space:nowrap;}
+.tab-btn:hover{color:#94a3b8;}.tab-btn.active{color:#f59e0b;border-bottom-color:#f59e0b;}
+.tool-btn{padding:5px 12px;background:#1e293b;border:1px solid #334155;border-radius:5px;color:#94a3b8;font-family:'Sora',system-ui,sans-serif;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tool-btn:hover{border-color:#f59e0b;color:#f59e0b;}
+.tool-btn.pri{background:#f59e0b;border-color:#f59e0b;color:#000;font-weight:600;}.tool-btn.pri:hover{background:#fbbf24;}
+.tool-btn.mesh-ready{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.5);color:#10b981;}.tool-btn.mesh-ready:hover{background:rgba(16,185,129,.22);border-color:#10b981;}
+.tool-btn.mesh-busy{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.3);color:#f59e0b;cursor:default;}
+.cam-btn{padding:5px 10px;background:#1e293b;border:1px solid #334155;border-radius:5px;color:#94a3b8;font-family:'Sora',system-ui,sans-serif;font-size:11px;cursor:pointer;transition:all .15s;}
+.cam-btn:hover{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.5);color:#f59e0b;}
+.mode-btn{padding:5px 12px;background:#1e293b;border:1px solid #334155;border-radius:5px;color:#94a3b8;font-family:'Sora',system-ui,sans-serif;font-size:11px;cursor:pointer;transition:all .15s;}
+.mode-btn.active{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.5);color:#f59e0b;}
+.bt-btn{background:#1e293b;color:#d1d5db;border:1px solid #334155;border-radius:5px;padding:5px 9px;font-size:11px;text-align:left;cursor:pointer;transition:all .12s;font-family:'Sora',system-ui,sans-serif;}
+.bt-btn:hover{border-color:#475569;color:#fff;}
+.bt-btn.active{background:#f59e0b;color:#000;border-color:#f59e0b;font-weight:600;}
+.tog{display:flex;align-items:center;gap:6px;padding:0 4px;cursor:pointer;font-size:11px;color:#94a3b8;user-select:none;}
+.tog input[type=checkbox]{appearance:none;-webkit-appearance:none;width:28px;height:15px;background:#263344;border:1px solid #334155;border-radius:8px;cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;}
+.tog input[type=checkbox]:checked{background:#f59e0b;border-color:#f59e0b;}
+.tog input[type=checkbox]::after{content:'';position:absolute;top:2px;left:2px;width:9px;height:9px;background:#fff;border-radius:50%;transition:transform .2s;}
+.tog input[type=checkbox]:checked::after{transform:translateX(13px);}
+.spd{padding:4px 10px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#94a3b8;font-family:'IBM Plex Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;}
+.spd.active{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.5);color:#f59e0b;}
+.divider{width:1px;background:#334155;align-self:stretch;margin:8px 0;flex-shrink:0;}
+input[type=color]{width:24px;height:20px;border:none;border-radius:3px;cursor:pointer;padding:0;background:transparent;}
+input[type=range]{accent-color:#f59e0b;cursor:pointer;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.spin{display:inline-block;animation:spin 1s linear infinite;}
+
+/* ── Terminal ── */
+#term-wrap{
+  position:fixed;
+  bottom:0;right:20px;
+  width:580px;
+  background:#0a0e1a;
+  border:1px solid #334155;
+  border-bottom:none;
+  border-radius:8px 8px 0 0;
+  display:flex;
+  flex-direction:column;
+  z-index:400;
+  box-shadow:0 -4px 32px rgba(0,0,0,.5);
+  transition:height .2s ease;
+  height:300px;
+}
+#term-wrap.minimized{height:36px;}
+#term-titlebar{
+  height:36px;flex-shrink:0;
+  background:#1e293b;
+  border-bottom:1px solid #334155;
+  border-radius:8px 8px 0 0;
+  display:flex;align-items:center;
+  padding:0 10px;gap:8px;
+  cursor:pointer;user-select:none;
+}
+#term-body{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  padding:8px 10px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  line-height:1.65;
+  color:#94a3b8;
+  background:#0a0e1a;
+}
+#term-body::-webkit-scrollbar{width:4px;}
+#term-body::-webkit-scrollbar-track{background:transparent;}
+#term-body::-webkit-scrollbar-thumb{background:#334155;border-radius:2px;}
+.tl-info  {color:#60a5fa;}
+.tl-ok    {color:#10b981;}
+.tl-err   {color:#ef4444;}
+.tl-warn  {color:#f59e0b;}
+.tl-dim   {color:#475569;}
+.tl-pipe  {color:#a78bfa;}
+.tl-gvhmr {color:#f472b6;}
+
+/* ── Player context menu ── */
+#player-menu{
+  position:fixed;
+  background:#1e293b;
+  border:1px solid #334155;
+  border-radius:8px;
+  padding:6px;
+  display:none;
+  flex-direction:column;
+  gap:2px;
+  z-index:300;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  min-width:140px;
+}
+#player-menu .pm-header{
+  font-size:9px;
+  font-family:'IBM Plex Mono',monospace;
+  color:#475569;
+  letter-spacing:.1em;
+  padding:4px 8px 6px;
+  border-bottom:1px solid #263344;
+  margin-bottom:2px;
+}
+#player-menu button{
+  padding:7px 12px;
+  background:transparent;
+  border:none;
+  border-radius:5px;
+  color:#94a3b8;
+  font-family:'Sora',system-ui,sans-serif;
+  font-size:11px;
+  font-weight:500;
+  cursor:pointer;
+  text-align:left;
+  transition:background .1s,color .1s;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+#player-menu button:hover{background:#263344;color:#e2e8f0;}
+#player-menu button .dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;
+}
+#export-panel{position:fixed;top:0;right:-360px;width:360px;height:100vh;background:#0f172a;border-left:1px solid #334155;z-index:100;display:flex;flex-direction:column;transition:right .25s cubic-bezier(.4,0,.2,1);overflow:hidden;}
+#export-panel.open{right:0;}
+.exp-card{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.exp-card-title{font-size:12px;font-weight:600;color:#e2e8f0;letter-spacing:.04em;}
+.exp-card-desc{font-size:10px;color:#475569;line-height:1.5;font-family:'IBM Plex Mono',monospace;}
+.exp-progress{height:3px;background:#263344;border-radius:2px;overflow:hidden;display:none;}
+.exp-progress-bar{height:100%;background:#f59e0b;border-radius:2px;width:0%;transition:width .1s;}
+.exp-btn{padding:5px 14px;background:#f59e0b;border:none;border-radius:5px;color:#000;font-family:'Sora',system-ui,sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:background .15s;align-self:flex-start;}
+.exp-btn:hover{background:#fbbf24;}
+.exp-btn:disabled{background:#334155;color:#475569;cursor:default;}
+.exp-status{font-size:10px;font-family:'IBM Plex Mono',monospace;color:#64748b;min-height:14px;}
+</style>
+</head>
+<body>
+
+<div style="width:100vw;height:100vh;display:flex;flex-direction:column;background:#0f172a;overflow:hidden;">
+
+  <!-- TOP BAR -->
+  <header style="height:52px;background:#1e293b;border-bottom:1px solid #334155;display:flex;align-items:center;padding:0;flex-shrink:0;z-index:20;">
+    <div style="display:flex;align-items:center;gap:10px;padding:0 20px;border-right:1px solid #334155;height:100%;flex-shrink:0;">
+      <div style="width:28px;height:28px;background:#f59e0b;border-radius:6px;display:grid;place-items:center;flex-shrink:0;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="5" width="4" height="8" rx="0.5" fill="#000"/><rect x="7" y="1" width="6" height="12" rx="0.5" fill="#000"/></svg>
+      </div>
+      <span style="font-size:15px;font-weight:700;letter-spacing:.06em;color:#e2e8f0;">FORMA</span>
+      <span style="font-size:8px;color:#f59e0b;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;padding:1px 5px;border:1px solid rgba(245,158,11,.35);border-radius:3px;line-height:1.5;">3D</span>
+    </div>
+    <nav style="display:flex;height:100%;">
+      <button class="tab-btn active" id="tab-tactical" onclick="switchTab('tactical')">TACTICAL</button>
+      <button class="tab-btn" id="tab-mesh" onclick="switchTab('mesh')">MESH</button>
+    </nav>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:0 16px;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div id="status-dot" style="width:6px;height:6px;border-radius:50%;background:#475569;flex-shrink:0;"></div>
+        <span id="status-text" style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#475569;letter-spacing:.05em;">IDLE</span>
+      </div>
+      <div class="divider"></div>
+      <button onclick="screenshotActive()" class="tool-btn">⎙ Screenshot</button>
+      <button onclick="toggleExportPanel()" class="tool-btn" id="btn-export">↓ Export Videos</button>
+      <button onclick="recordMp4Mesh()" class="tool-btn" id="btn-record-mp4" disabled title="Record the MESH tab as MP4">● Record MP4</button>
+      <button onclick="termToggle()" class="tool-btn" id="btn-term" title="Toggle terminal">⬛ Terminal</button>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div style="height:42px;background:#1e293b;border-bottom:1px solid rgba(51,65,85,.6);display:flex;align-items:center;padding:0 12px;gap:0;flex-shrink:0;overflow-x:auto;">
+    <div style="display:flex;align-items:center;gap:6px;padding:0 10px;">
+      <button class="tool-btn pri" onclick="document.getElementById('fi').click()">▲ Upload Video / Image</button>
+      <button class="tool-btn" onclick="document.getElementById('fj').click()">Result JSON</button>
+      <button class="tool-btn" onclick="document.getElementById('fmesh').click()">Mesh JSON</button>
+      <button id="btn-gen-mesh" class="tool-btn" style="display:none;" onclick="startMeshLift()">⬡ Generate Meshes</button>
+      <input type="file" id="fi"    accept=".mp4,.avi,.mov,.mkv,.jpg,.jpeg,.png,.bmp,.webp" onchange="uploadVideo(this)"      style="display:none">
+      <input type="file" id="fj"    accept=".json"               onchange="openResultJson(this)"   style="display:none">
+      <input type="file" id="fmesh" accept=".json"               onchange="openMeshJsonFile(this)" style="display:none">
+    </div>
+    <div class="divider"></div>
+    <div style="display:flex;align-items:center;gap:4px;padding:0 10px;">
+      <span style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:#475569;letter-spacing:.08em;margin-right:4px;">CAM</span>
+      <button class="cam-btn" onclick="setPresetActive('broadcast')">Broadcast</button>
+      <button class="cam-btn" onclick="setPresetActive('top')">Bird's Eye</button>
+      <button class="cam-btn" onclick="setPresetActive('sideline')">Sideline</button>
+      <button class="cam-btn" onclick="setPresetActive('corner')">Corner</button>
+    </div>
+    <div class="divider"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 10px;">
+      <span style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:#475569;letter-spacing:.08em;">TEAMS</span>
+      <div style="display:flex;align-items:center;gap:5px;">
+        <div id="swA" style="width:12px;height:12px;border-radius:2px;background:#CC2222;"></div>
+        <span style="font-size:11px;color:#94a3b8;">A</span>
+        <input type="color" id="colA" value="#CC2222" onchange="applyColors();document.getElementById('swA').style.background=this.value;">
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;">
+        <div id="swB" style="width:12px;height:12px;border-radius:2px;background:#1144CC;"></div>
+        <span style="font-size:11px;color:#94a3b8;">B</span>
+        <input type="color" id="colB" value="#1144CC" onchange="applyColors();document.getElementById('swB').style.background=this.value;">
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;">
+        <div id="swR" style="width:12px;height:12px;border-radius:2px;background:#FFD400;"></div>
+        <span style="font-size:11px;color:#94a3b8;">Ref</span>
+        <input type="color" id="colR" value="#FFD400" onchange="applyColors();document.getElementById('swR').style.background=this.value;">
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div id="tac-toolbar" style="display:flex;align-items:center;gap:4px;padding:0 10px;">
+      <button class="mode-btn active" id="mode-cartoon"   onclick="setWorld('cartoon')">Cartoon</button>
+      <button class="mode-btn"        id="mode-realistic" onclick="setWorld('realistic')">Realistic</button>
+      <div class="divider"></div>
+      <label class="tog">IDs<input    type="checkbox" id="sw-ids"     checked onchange="toggleIds(this.checked)"></label>
+      <label class="tog">Trails<input type="checkbox" id="sw-trails"  checked onchange="toggleTrails(this.checked)"></label>
+      <label class="tog">Markers<input type="checkbox" id="sw-markers" checked onchange="toggleMarkers(this.checked)"></label>
+    </div>
+    <div id="mesh-toolbar" style="display:none;align-items:center;gap:10px;padding:0 10px;">
+      <label class="tog">Wire<input   type="checkbox" id="sw-wire"     onchange="meshToggleWireframe(this.checked)"></label>
+      <label class="tog">IDs<input    type="checkbox" id="sw-mesh-ids" checked onchange="meshToggleIds(this.checked)"></label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:10px;color:#475569;">Tilt</span>
+        <input type="range" id="tilt" min="-90" max="90" value="0" oninput="meshSetTilt(this.value)" style="width:70px;">
+        <span id="tilt-lbl" style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#94a3b8;min-width:24px;">0°</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:10px;color:#475569;">Yaw</span>
+        <input type="range" id="yaw-off" min="-180" max="180" value="0" oninput="meshSetYawOffset(this.value)" style="width:70px;">
+        <span id="yaw-off-lbl" style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#94a3b8;min-width:24px;">0°</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN VIEWPORT -->
+  <div style="flex:1;display:flex;overflow:hidden;position:relative;">
+
+    <!-- TACTICAL TAB -->
+    <div id="view-tactical" style="flex:1;display:flex;overflow:hidden;">
+      <div id="video-panel" style="width:30%;min-width:180px;border-right:1px solid #334155;position:relative;background:#0a0f1a;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="position:absolute;top:0;left:0;right:0;z-index:2;padding:7px 12px;background:rgba(15,23,42,.8);border-bottom:1px solid rgba(51,65,85,.4);display:flex;align-items:center;gap:8px;backdrop-filter:blur(4px);">
+          <div style="width:6px;height:6px;border-radius:50%;background:#334155;flex-shrink:0;"></div>
+          <span style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#475569;letter-spacing:.08em;">VIDEO FEED</span>
+          <span id="vid-status" style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#64748b;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;"></span>
+        </div>
+        <div id="vid-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:28px;z-index:1;">
+          <div style="width:52px;height:52px;background:#1e293b;border:2px dashed #334155;border-radius:10px;display:grid;place-items:center;color:#475569;">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 5h14v12H4zM9 9l5 2-5 2V9z" fill="currentColor"/></svg>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:#94a3b8;margin-bottom:6px;">No video loaded</div>
+            <div style="font-size:11px;color:#475569;line-height:1.6;">Upload a match recording or still image to start processing</div>
+          </div>
+          <label style="padding:7px 18px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#f59e0b;">
+            Choose file<input type="file" accept=".mp4,.avi,.mov,.mkv,.jpg,.jpeg,.png,.bmp,.webp" onchange="uploadVideo(this)" style="display:none">
+          </label>
+        </div>
+        <video id="vid" style="width:100%;height:100%;object-fit:contain;display:none;" muted crossorigin="anonymous"></video>
+        <img id="vid-img" style="width:100%;height:100%;object-fit:contain;display:none;" alt="">
+        <canvas id="det-canvas" style="position:absolute;inset:0;pointer-events:none;display:none;z-index:3;"></canvas>
+      </div>
+      <div id="three-panel" style="flex:1;position:relative;">
+        <canvas id="c" style="display:block;width:100%;height:100%;"></canvas>
+        <div style="position:absolute;top:0;left:0;right:0;padding:7px 12px;background:rgba(15,23,42,.6);border-bottom:1px solid rgba(51,65,85,.3);display:flex;align-items:center;gap:8px;backdrop-filter:blur(4px);">
+          <div style="width:6px;height:6px;border-radius:50%;background:#334155;flex-shrink:0;"></div>
+          <span style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#475569;letter-spacing:.08em;">3D RECONSTRUCTION</span>
+        </div>
+        <div style="position:absolute;top:36px;left:10px;display:flex;flex-direction:column;gap:4px;z-index:5;">
+          <button class="cam-btn" onclick="setPresetActive('top')"       style="font-size:10px;padding:4px 10px;">Bird's Eye</button>
+          <button class="cam-btn" onclick="setPresetActive('broadcast')" style="font-size:10px;padding:4px 10px;">Broadcast</button>
+          <button class="cam-btn" onclick="setPresetActive('sideline')"  style="font-size:10px;padding:4px 10px;">Sideline</button>
+          <button class="cam-btn" onclick="setPresetActive('corner')"    style="font-size:10px;padding:4px 10px;">Corner</button>
+        </div>
+        <div style="position:absolute;top:36px;right:12px;background:rgba(15,23,42,.9);border:1px solid #334155;border-radius:8px;padding:12px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2.1;backdrop-filter:blur(8px);z-index:5;min-width:160px;">
+          <div style="font-size:9px;color:#f59e0b;letter-spacing:.12em;margin-bottom:4px;font-weight:600;">FRAME DATA</div>
+          <div style="color:#475569;">Frame   <span id="h-frame"   style="color:#e2e8f0;">—</span></div>
+          <div style="color:#475569;">Time    <span id="h-time"    style="color:#e2e8f0;">0.0s</span></div>
+          <div style="color:#475569;">Players <span id="h-players" style="color:#e2e8f0;">0</span></div>
+          <div style="color:#475569;">Homo    <span id="h-homo"    style="color:#10b981;">—</span></div>
+        </div>
+        <!-- ╔══ BROADCAST TACTICAL TOOLS (BROADCAST_TOOLS_V1) ══ -->
+        <div id="tac-tactics-panel" style="position:absolute;top:176px;left:10px;background:rgba(15,23,42,.94);border:1px solid #334155;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:5px;min-width:150px;box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:6;font-family:'Sora',system-ui,sans-serif;">
+          <div style="font-size:9px;color:#f59e0b;letter-spacing:.12em;font-weight:600;margin-bottom:2px;">BROADCAST TOOLS</div>
+          <button class="bt-btn active" data-bt="tac" data-tool="select"    onclick="BT.tool('tac','select')">↖ Select</button>
+          <button class="bt-btn"        data-bt="tac" data-tool="spotlight" onclick="BT.tool('tac','spotlight')">◎ Spotlight</button>
+          <button class="bt-btn"        data-bt="tac" data-tool="connect"   onclick="BT.tool('tac','connect')">⛓ Connect</button>
+          <button class="bt-btn"        data-bt="tac" data-tool="arrow"     onclick="BT.tool('tac','arrow')">→ Arrow</button>
+          <button class="bt-btn"        data-bt="tac" data-tool="zone"      onclick="BT.tool('tac','zone')">⬭ Zone</button>
+          <button class="bt-btn"        data-bt="tac" data-tool="label"     onclick="BT.tool('tac','label')">▦ Label</button>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;margin-top:3px;"><span>Color</span><input type="color" id="tac-bt-color" value="#ffd400" style="width:28px;height:20px;border:none;border-radius:3px;cursor:pointer;padding:0;"></div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;"><span>Size</span><input type="range" id="tac-bt-size" min="1" max="10" value="4" style="flex:1;"></div>
+          <label id="tac-bt-dash-row" style="display:none;align-items:center;gap:6px;font-size:10px;color:#94a3b8;cursor:pointer;"><input type="checkbox" id="tac-bt-dash" style="cursor:pointer;"> Dashed</label>
+          <button class="bt-btn" onclick="BT.undo('tac')" style="margin-top:3px;">↶ Undo</button>
+          <button class="bt-btn" onclick="BT.clear('tac')">✕ Clear All</button>
+          <div id="tac-bt-count" style="font-size:9px;color:#475569;text-align:center;margin-top:2px;font-family:'IBM Plex Mono',monospace;">0 drawings</div>
+        </div>
+        <div id="empty-3d" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:4;">
+          <div style="text-align:center;animation:fadeUp .4s ease;">
+            <div style="font-size:42px;margin-bottom:14px;opacity:.08;">⬡</div>
+            <div style="font-size:13px;color:#475569;font-weight:500;">Upload a video or load a result JSON</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MESH TAB -->
+    <div id="view-mesh" style="flex:1;display:none;overflow:hidden;">
+      <div style="position:relative;width:100%;height:100%;">
+        <canvas id="c-mesh" style="display:block;width:100%;height:100%;"></canvas>
+        <div style="position:absolute;top:0;left:0;right:0;padding:7px 12px;background:rgba(15,23,42,.6);border-bottom:1px solid rgba(51,65,85,.3);display:flex;align-items:center;gap:8px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#334155;flex-shrink:0;"></div>
+          <span style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#475569;letter-spacing:.08em;">SMPL-X MESH VIEWER</span>
+          <span id="mesh-info" style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#64748b;margin-left:auto;">no file loaded</span>
+        </div>
+        <div style="position:absolute;top:36px;left:10px;display:flex;flex-direction:column;gap:4px;z-index:5;">
+          <button class="cam-btn" onclick="meshSetPreset('top')"       style="font-size:10px;padding:4px 10px;">Bird's Eye</button>
+          <button class="cam-btn" onclick="meshSetPreset('broadcast')" style="font-size:10px;padding:4px 10px;">Broadcast</button>
+          <button class="cam-btn" onclick="meshSetPreset('sideline')"  style="font-size:10px;padding:4px 10px;">Sideline</button>
+          <button class="cam-btn" onclick="meshSetPreset('corner')"    style="font-size:10px;padding:4px 10px;">Corner</button>
+        </div>
+        <div style="position:absolute;top:36px;right:12px;background:rgba(15,23,42,.9);border:1px solid #334155;border-radius:8px;padding:12px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2.1;backdrop-filter:blur(8px);z-index:5;">
+          <div style="font-size:9px;color:#f59e0b;letter-spacing:.12em;margin-bottom:4px;">MESH DATA</div>
+          <div style="color:#475569;">Frame <span id="mh-frame" style="color:#e2e8f0;">—</span> / <span id="mh-total" style="color:#e2e8f0;">—</span></div>
+          <div style="color:#475569;">Players <span id="mh-players" style="color:#e2e8f0;">0</span></div>
+          <div style="color:#475569;">Tracks  <span id="mh-tracks"  style="color:#e2e8f0;">0</span></div>
+        </div>
+        
+<!-- ╔══ MESH-TAB BROADCAST TOOLS (BROADCAST_TOOLS_V1) ══ -->
+<div id="mesh-tactics-panel" style="position:absolute;top:180px;left:10px;background:rgba(15,23,42,.94);border:1px solid #334155;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:5px;min-width:150px;box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:6;font-family:'Sora',system-ui,sans-serif;">
+  <div style="font-size:9px;color:#f59e0b;letter-spacing:.12em;font-weight:600;margin-bottom:2px;">BROADCAST TOOLS</div>
+  <button class="bt-btn active" data-bt="mesh" data-tool="select"    onclick="BT.tool('mesh','select')">↖ Select</button>
+  <button class="bt-btn"        data-bt="mesh" data-tool="spotlight" onclick="BT.tool('mesh','spotlight')">◎ Spotlight</button>
+  <button class="bt-btn"        data-bt="mesh" data-tool="connect"   onclick="BT.tool('mesh','connect')">⛓ Connect</button>
+  <button class="bt-btn"        data-bt="mesh" data-tool="arrow"     onclick="BT.tool('mesh','arrow')">→ Arrow</button>
+  <button class="bt-btn"        data-bt="mesh" data-tool="zone"      onclick="BT.tool('mesh','zone')">⬭ Zone</button>
+  <button class="bt-btn"        data-bt="mesh" data-tool="label"     onclick="BT.tool('mesh','label')">▦ Label</button>
+  <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;margin-top:3px;"><span>Color</span><input type="color" id="mesh-bt-color" value="#ffd400" style="width:28px;height:20px;border:none;border-radius:3px;cursor:pointer;padding:0;"></div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;"><span>Size</span><input type="range" id="mesh-bt-size" min="1" max="10" value="4" style="flex:1;"></div>
+  <label id="mesh-bt-dash-row" style="display:none;align-items:center;gap:6px;font-size:10px;color:#94a3b8;cursor:pointer;"><input type="checkbox" id="mesh-bt-dash" style="cursor:pointer;"> Dashed</label>
+  <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;cursor:pointer;margin-top:2px;"><input type="checkbox" id="mesh-bt-markers" onchange="BT.setMarkers('mesh',this.checked)" style="cursor:pointer;"> Player markers</label>
+  <button class="bt-btn" onclick="BT.undo('mesh')" style="margin-top:3px;">↶ Undo</button>
+  <button class="bt-btn" onclick="BT.clear('mesh')">✕ Clear All</button>
+  <div id="mesh-bt-count" style="font-size:9px;color:#475569;text-align:center;margin-top:2px;font-family:'IBM Plex Mono',monospace;">0 drawings</div>
+</div>
+        <div id="empty-mesh" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:4;">
+          <div style="text-align:center;max-width:300px;">
+            <div style="font-size:13px;color:#475569;line-height:1.8;">Upload a video then click<br><strong style="color:#94a3b8;">⬡ Generate Meshes</strong><br>to build SMPL-X bodies</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PLAYBAR -->
+  <div style="height:46px;background:#1e293b;border-top:1px solid #334155;display:flex;align-items:center;padding:0 16px;gap:14px;flex-shrink:0;">
+    <button id="play-btn" onclick="togglePlayActive()" style="width:32px;height:32px;border-radius:50%;background:#f59e0b;border:none;cursor:pointer;color:#000;font-size:11px;flex-shrink:0;font-weight:700;display:grid;place-items:center;transition:background .15s;">▶</button>
+    <div id="timeline" onclick="seekActive(event)" style="flex:1;height:4px;background:#263344;border-radius:2px;cursor:pointer;position:relative;">
+      <div id="tl-fill" style="height:100%;background:#f59e0b;border-radius:2px;width:0%;pointer-events:none;transition:width .05s;"></div>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <button class="spd"        onclick="setSpdActive(0.5,this)">½×</button>
+      <button class="spd active" onclick="setSpdActive(1,this)">1×</button>
+      <button class="spd"        onclick="setSpdActive(2,this)">2×</button>
+    </div>
+    <span id="time-lbl" style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#475569;white-space:nowrap;min-width:100px;text-align:right;">0.0s / 0.0s</span>
+  </div>
+
+</div>
+
+<!-- ╔══ EXPORT PANEL ═══════════════════════════════════════════════════════╗ -->
+<div id="export-panel">
+  <div style="height:52px;background:#1e293b;border-bottom:1px solid #334155;display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0;">
+    <span style="font-size:9px;color:#f59e0b;font-family:'IBM Plex Mono',monospace;letter-spacing:.15em;font-weight:500;">EXPORT VIDEOS</span>
+    <div style="flex:1;"></div>
+    <button onclick="toggleExportPanel()" class="tool-btn" style="padding:3px 10px;">✕</button>
+  </div>
+  <div style="padding:12px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;">
+
+  <div style="font-size:10px;font-family:'IBM Plex Mono',monospace;color:#475569;line-height:1.6;padding:4px 0 8px;">
+  Server-side OpenCV rendering — pixel-accurate overlays from the original frames.
+  </div>
+
+    <!-- Generate button + overall progress -->
+  <div class="exp-card">
+    <div class="exp-card-title">Generate All Videos</div>
+  <div class="exp-card-desc">Renders all 5 stage videos server-side using OpenCV. Takes a few minutes depending on clip length.</div>
+  <div class="exp-progress" id="prog-export"><div class="exp-progress-bar" id="bar-export"></div></div>
+  <div class="exp-status" id="status-export"></div>
+  <button class="exp-btn" id="btn-export-gen" onclick="startServerExport()" disabled>▶ Generate</button>
+  </div>
+
+    <!-- Per-stage download cards -->
+  <div class="exp-card">
+    <div class="exp-card-title">① Player Detection</div>
+  <div class="exp-card-desc">BBoxes + IDs colored by role — Player · Goalkeeper · Referee · Ball</div>
+  <button class="exp-btn" id="dl-detection" onclick="dlStage('detection')" disabled>↓ Download</button>
+  </div>
+
+  <div class="exp-card">
+    <div class="exp-card-title">② Player Clustering</div>
+      <div class="exp-card-desc">BBoxes colored by team assignment — Team A · Team B · GK · Referee</div>
+    <button class="exp-btn" id="dl-clustering" onclick="dlStage('clustering')" disabled>↓ Download</button>
+  </div>
+
+  <div class="exp-card">
+  <div class="exp-card-title">③ Keypoints &amp; Lines</div>
+  <div class="exp-card-desc">PnLCalib pitch keypoints (colored dots) + detected line segments — no players</div>
+  <button class="exp-btn" id="dl-keypoints" onclick="dlStage('keypoints')" disabled>↓ Download</button>
+  </div>
+
+  <div class="exp-card">
+    <div class="exp-card-title">④ PnLCalib Homography</div>
+  <div class="exp-card-desc">Keypoints + lines + player boxes + 2D bird's-eye minimap inset</div>
+  <button class="exp-btn" id="dl-pnlcalib" onclick="dlStage('pnlcalib')" disabled>↓ Download</button>
+  </div>
+
+  <div class="exp-card">
+    <div class="exp-card-title">⑤ ViTPose Skeleton</div>
+      <div class="exp-card-desc">Bounding boxes + 17-point COCO skeleton — thin limb lines, small colored dots</div>
+    <button class="exp-btn" id="dl-pose" onclick="dlStage('pose')" disabled>↓ Download</button>
+  </div>
+
+  </div>
+</div>
+
+<!-- PLAYER CONTEXT MENU -->
+<div id="player-menu">
+  <div class="pm-header" id="pm-title">PLAYER #—</div>
+  <button onclick="reassignPlayer(0)"><span class="dot" id="pm-dot-a"></span>Team A</button>
+  <button onclick="reassignPlayer(1)"><span class="dot" id="pm-dot-b"></span>Team B</button>
+  <button onclick="reassignPlayer('goalkeeper')"><span class="dot" style="background:#00E5A0"></span>Goalkeeper</button>
+  <button onclick="reassignPlayer('referee')"><span class="dot" style="background:#FFD400"></span>Referee</button>
+  <button onclick="closePlayerMenu()" style="color:#475569;margin-top:2px;border-top:1px solid #263344;border-radius:0 0 4px 4px;">Cancel</button>
+</div>
+
+<!-- PROCESSING OVERLAY -->
+<div id="prog-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.82);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(6px);pointer-events:none;">
+  <div style="background:#1e293b;border:1px solid rgba(245,158,11,.2);border-radius:14px;padding:36px 48px 28px;text-align:center;width:440px;animation:fadeUp .25s ease;pointer-events:auto;">
+    <div id="prog-label" style="font-size:9px;color:#f59e0b;font-family:'IBM Plex Mono',monospace;letter-spacing:.18em;margin-bottom:16px;font-weight:500;">PROCESSING</div>
+    <h2 id="prog-title" style="font-size:20px;font-weight:700;margin-bottom:8px;color:#e2e8f0;">Analyzing Video</h2>
+    <p id="prog-msg" style="font-size:12px;color:#94a3b8;margin-bottom:22px;font-family:'IBM Plex Mono',monospace;"> </p>
+    <div style="background:#263344;border-radius:3px;height:4px;margin-bottom:16px;overflow:hidden;border:1px solid #334155;">
+      <div id="prog-bar" style="background:#f59e0b;height:100%;border-radius:3px;width:0%;transition:width .3s;"></div>
+    </div>
+    <div id="prog-pct" style="font-size:44px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#f59e0b;line-height:1;">0%</div>
+    <div id="prog-stats" style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#475569;margin-top:10px;line-height:2;"></div>
+    <!-- Live log tail inside the overlay -->
+    <div id="overlay-log"
+         style="margin-top:14px;text-align:left;background:#0a0e1a;border:1px solid #263344;border-radius:6px;
+                padding:8px 10px;height:90px;overflow-y:auto;font-family:'IBM Plex Mono',monospace;
+                font-size:10px;color:#475569;line-height:1.6;">
+    </div>
+  </div>
+</div>
+
+
+<!-- ╔══ MESH RECORDING OVERLAY (added by apply_mesh_features.py) ══════════ -->
+<div id="rec-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:28px 36px;min-width:360px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.6);">
+    <div id="rec-title" style="font-size:14px;color:#f59e0b;font-weight:600;letter-spacing:.06em;margin-bottom:14px;font-family:'Sora',system-ui,sans-serif;"><span id="rec-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:6px;vertical-align:middle;animation:recpulse 1.2s infinite;"></span>Recording…</div>
+    <div style="height:6px;background:#263344;border-radius:3px;overflow:hidden;margin:10px 0;"><div id="rec-bar" style="height:100%;background:linear-gradient(90deg,#3b82f6,#10b981);width:0%;transition:width .2s;"></div></div>
+    <div id="rec-stage" style="font-size:11px;color:#94a3b8;font-family:'IBM Plex Mono',monospace;margin:8px 0 4px;">Frame 0 / 0</div>
+    <div id="rec-detail" style="font-size:10px;color:#475569;font-family:'IBM Plex Mono',monospace;min-height:14px;"></div>
+    <button onclick="meshCancelRecording()" style="margin-top:14px;padding:6px 16px;background:#334155;color:#e2e8f0;border:none;border-radius:5px;font-size:11px;cursor:pointer;font-family:'Sora',system-ui,sans-serif;">Cancel</button>
+  </div>
+</div>
+<style>@keyframes recpulse{0%,100%{opacity:1}50%{opacity:.3}}</style>
+
+<div id="status-msg" style="display:none;position:fixed;bottom:56px;left:14px;background:rgba(30,41,59,.96);border:1px solid #334155;padding:7px 14px;border-radius:6px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:#94a3b8;z-index:50;max-width:440px;line-height:1.5;backdrop-filter:blur(4px);"></div>
+
+<!-- ╔══ TERMINAL ═══════════════════════════════════════════════════════════════════╝ -->
+<div id="term-wrap" style="display:none;">
+  <div id="term-titlebar" onclick="termToggleMinimize()">
+    <span style="width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0;" id="term-dot"></span>
+    <span style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:#f59e0b;letter-spacing:.15em;font-weight:500;">BACKEND TERMINAL</span>
+    <span style="flex:1;"></span>
+    <span id="term-conn" style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:#475569;">connecting…</span>
+    <div style="display:flex;gap:4px;margin-left:8px;">
+      <button onclick="event.stopPropagation();termClear()" style="padding:2px 8px;background:#263344;border:1px solid #334155;border-radius:3px;color:#64748b;font-size:9px;font-family:'IBM Plex Mono',monospace;cursor:pointer;" title="Clear">CLR</button>
+      <button onclick="event.stopPropagation();termToggleSize()" id="term-size-btn" style="padding:2px 8px;background:#263344;border:1px solid #334155;border-radius:3px;color:#64748b;font-size:9px;font-family:'IBM Plex Mono',monospace;cursor:pointer;" title="Expand / Shrink">△</button>
+      <button onclick="event.stopPropagation();termToggle()" style="padding:2px 8px;background:#263344;border:1px solid #334155;border-radius:3px;color:#64748b;font-size:9px;font-family:'IBM Plex Mono',monospace;cursor:pointer;" title="Close">×</button>
+    </div>
+  </div>
+  <div id="term-body"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TERMINAL
+// ═══════════════════════════════════════════════════════════════════════════
+let _termVisible   = false;
+let _termMinimized = false;
+let _termExpanded  = false;   // tall mode
+let _termSse       = null;
+let _termAutoScroll = true;
+let _termLineCount  = 0;
+const _TERM_MAX_LINES = 800;
+
+function termToggle() {
+  _termVisible = !_termVisible;
+  const wrap = document.getElementById('term-wrap');
+  wrap.style.display = _termVisible ? 'flex' : 'none';
+  if (!_termSse) _termConnect();  // always connect SSE, even if panel stays hidden
+}
+
+function termToggleMinimize() {
+  _termMinimized = !_termMinimized;
+  document.getElementById('term-wrap').classList.toggle('minimized', _termMinimized);
+}
+
+function termToggleSize() {
+  _termExpanded = !_termExpanded;
+  const wrap = document.getElementById('term-wrap');
+  wrap.style.height = _termExpanded ? '520px' : '300px';
+  document.getElementById('term-size-btn').textContent = _termExpanded ? '▽' : '△';
+}
+
+function termClear() {
+  document.getElementById('term-body').innerHTML = '';
+  _termLineCount = 0;
+}
+
+function _termConnect() {
+  const sse = new EventSource('/logs');
+  _termSse = sse;
+
+  sse.onopen = () => {
+    document.getElementById('term-conn').textContent = 'connected';
+    document.getElementById('term-conn').style.color = '#10b981';
+    document.getElementById('term-dot').style.background = '#10b981';
+    _termAppend('── connected to backend ──', 'tl-dim');
+  };
+
+  sse.onmessage = (e) => {
+    _termAppend(e.data);
+  };
+
+  sse.onerror = () => {
+    document.getElementById('term-conn').textContent = 'reconnecting…';
+    document.getElementById('term-conn').style.color = '#f59e0b';
+    document.getElementById('term-dot').style.background = '#f59e0b';
+    _termAppend('── connection lost — retrying ──', 'tl-warn');
+  };
+}
+
+function _termClassify(line) {
+  const l = line.toLowerCase();
+  if (l.includes('error') || l.includes('failed') || l.includes('exception') || l.includes('traceback')) return 'tl-err';
+  if (l.includes('warning') || l.includes('warn'))  return 'tl-warn';
+  if (l.includes('\u2713') || l.includes('done') || l.includes('complete') || l.includes('loaded')) return 'tl-ok';
+  if (l.includes('[gvhmr'))   return 'tl-gvhmr';
+  if (l.includes('[pipeline')) return 'tl-pipe';
+  if (l.includes('[server'))  return 'tl-info';
+  return '';
+}
+
+function _termAppend(raw, forceClass) {
+  const body = document.getElementById('term-body');
+  if (!body) return;
+
+  // Trim excess lines
+  if (_termLineCount >= _TERM_MAX_LINES) {
+    const first = body.firstChild;
+    if (first) { body.removeChild(first); _termLineCount--; }
+  }
+
+  const div = document.createElement('div');
+  const cls = forceClass || _termClassify(raw);
+  if (cls) div.className = cls;
+
+  // Highlight timestamps like [12:34:56]
+  div.innerHTML = raw
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/(\[\d{2}:\d{2}:\d{2}\])/g, '<span class="tl-dim">$1</span>');
+
+  body.appendChild(div);
+  _termLineCount++;
+
+  // Also mirror into the overlay log box when it's visible
+  const overlayLog = document.getElementById('overlay-log');
+  if (overlayLog && document.getElementById('prog-overlay').style.display !== 'none') {
+    const od = document.createElement('div');
+    od.textContent = raw;
+    if (cls) od.style.color = {
+      'tl-err':'#ef4444','tl-warn':'#f59e0b','tl-ok':'#10b981',
+      'tl-pipe':'#a78bfa','tl-gvhmr':'#f472b6','tl-info':'#60a5fa'
+    }[cls] || '#475569';
+    overlayLog.appendChild(od);
+    // Keep only last 30 lines in overlay log
+    while (overlayLog.children.length > 30) overlayLog.removeChild(overlayLog.firstChild);
+    overlayLog.scrollTop = overlayLog.scrollHeight;
+  }
+
+  // Auto-scroll only if already near bottom
+  if (_termAutoScroll) {
+    body.scrollTop = body.scrollHeight;
+  }
+}
+
+// Pause auto-scroll when user scrolls up, resume when at bottom
+document.addEventListener('DOMContentLoaded', () => {
+  const body = document.getElementById('term-body');
+  if (body) {
+    body.addEventListener('scroll', () => {
+      const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 30;
+      _termAutoScroll = atBottom;
+    });
+  }
+  // Connect SSE immediately so overlay-log works even before terminal is opened
+  _termConnect();
+  // Restore UI if a job was already done before this page load
+  _restoreJobState();
+});
+
+async function _restoreJobState() {
+  // The server keeps job state in memory for the process lifetime.
+  // Try to find the most recently completed job by checking a known
+  // endpoint pattern. We store the last job_id in sessionStorage so
+  // a refresh within the same browser session can recover it.
+  const savedId = sessionStorage.getItem('forma_job_id');
+  if (!savedId) return;
+  try {
+    const res = await fetch('/status/' + savedId);
+    if (!res.ok) return;  // job gone (server restarted)
+    const d = await res.json();
+    if (d.status !== 'done') return;
+    // Job is still done on the server — restore buttons
+    _currentJobId = savedId;
+    document.getElementById('btn-export').style.display = '';
+    document.getElementById('btn-export-gen').disabled = false;
+    const gmBtn = document.getElementById('btn-gen-mesh');
+    gmBtn.style.display = ''; gmBtn.className = 'tool-btn mesh-ready';
+    gmBtn.textContent = '⧁ Generate Meshes'; gmBtn.disabled = false;
+    _setStatus('done', 'DONE');
+    _showToast('Previous job ' + savedId + ' still available. Load Result JSON to restore data.', 6000);
+  } catch(e) { /* server not ready yet, ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════════════════════
+let activeTab = 'tactical';
+function switchTab(tab) {
+  activeTab = tab;
+  ['tactical','mesh'].forEach(t => {
+    document.getElementById('view-'+t).style.display = t===tab?'flex':'none';
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+  });
+  document.getElementById('tac-toolbar').style.display  = tab==='tactical'?'flex':'none';
+  document.getElementById('mesh-toolbar').style.display = tab==='mesh'?'flex':'none';
+  if(tab==='mesh'&&!meshInitialized) initMeshScene();
+  setTimeout(()=>{if(tab==='tactical')tacResize();else meshResize();},60);
+}
+function setPresetActive(n){if(activeTab==='mesh')meshSetPreset(n);else tacSetPreset(n);}
+function togglePlayActive(){if(activeTab==='mesh')meshTogglePlay();else tacTogglePlay();}
+function seekActive(e){if(activeTab==='mesh')meshSeek(e);else tacSeek(e);}
+function setSpdActive(s,b){if(activeTab==='mesh')meshSetSpd(s,b);else tacSetSpd(s,b);}
+function screenshotActive(){if(activeTab==='mesh')meshScreenshot();else tacScreenshot();}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORT PANEL
+// ═══════════════════════════════════════════════════════════════════════════
+let _exportPanelOpen = false;
+function toggleExportPanel() {
+  _exportPanelOpen = !_exportPanelOpen;
+  document.getElementById('export-panel').classList.toggle('open', _exportPanelOpen);
+}
+function _setExportReady(ready) {
+  // enable/disable the Generate button only
+  document.getElementById('btn-export-gen').disabled = !ready;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE CONTROLLER
+// ═══════════════════════════════════════════════════════════════════════════
+let _currentJobId = null;
+let _pollTimer    = null;
+
+function _setStatus(state,text){
+  const colors={idle:'#475569',processing:'#f59e0b',done:'#10b981',error:'#ef4444'};
+  document.getElementById('status-dot').style.background = colors[state]||colors.idle;
+  document.getElementById('status-text').style.color     = colors[state]||colors.idle;
+  document.getElementById('status-text').textContent     = text;
+}
+function _showToast(msg,ms){
+  const el=document.getElementById('status-msg');
+  el.textContent=msg;el.style.display='block';
+  clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',ms||4000);
+}
+function _showOverlay(title,label,msg,pct){
+  document.getElementById('prog-title').textContent=title;
+  document.getElementById('prog-label').textContent=label;
+  document.getElementById('prog-msg').textContent=msg;
+  document.getElementById('prog-bar').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=pct+'%';
+  document.getElementById('prog-stats').textContent='';
+  const ol=document.getElementById('overlay-log'); if(ol) ol.innerHTML='';
+  document.getElementById('prog-overlay').style.display='flex';
+}
+function _hideOverlay(){document.getElementById('prog-overlay').style.display='none';}
+function _updateOverlay(msg,pct,stats){
+  document.getElementById('prog-msg').textContent=msg;
+  document.getElementById('prog-bar').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=Math.round(pct)+'%';
+  if(stats!==undefined)document.getElementById('prog-stats').textContent=stats;
+}
+
+// Full reset so each new upload starts clean without a page refresh: clears
+// the tactical and mesh scenes, cancels in-flight polling, and returns every
+// button/status to its initial state.
+function resetDashboard(){
+  clearInterval(_pollTimer); clearInterval(_exportPollTimer);
+
+  // Tactical scene
+  tacFrameData=null; tacPlaying=false; tacCurFrame=0; tacLastTick=0;
+  Object.values(tacPools.cartoon).forEach(m=>tacScene.remove(m));
+  Object.values(tacPools.realistic).forEach(m=>tacScene.remove(m));
+  tacPools.cartoon={}; tacPools.realistic={}; tacPool=tacPools[tacWorld];
+  Object.keys(tacTrails).forEach(id=>{tacScene.remove(tacTrails[id].line);delete tacTrails[id];});
+  Object.keys(teamMap).forEach(k=>delete teamMap[k]);
+  tacBall.visible=false;
+  document.getElementById('empty-3d').style.display='';
+  document.getElementById('play-btn').textContent='▶';
+  document.getElementById('h-frame').textContent='—';
+  document.getElementById('h-players').textContent='0';
+  document.getElementById('h-homo').textContent='—';
+  document.getElementById('tl-fill').style.width='0%';
+
+  // Mesh scene
+  if(meshInitialized){ try{_meshClearAll();}catch(e){} }
+  meshFrames=[]; meshTotalFrames=0; meshCurFrame=0; meshPlaying=false; meshMetadata=null;
+  for(const k of Object.keys(meshTrackOverrides))delete meshTrackOverrides[k];
+  document.getElementById('empty-mesh').style.display='';
+  document.getElementById('mesh-info').textContent='no file loaded';
+  document.getElementById('mh-frame').textContent='—';
+  document.getElementById('mh-players').textContent='0';
+  document.getElementById('mh-tracks').textContent='0';
+
+  // Buttons + status
+  const gm=document.getElementById('btn-gen-mesh'); gm.style.display='none'; gm.className='tool-btn'; gm.disabled=false; gm.textContent='⬡ Generate Meshes';
+  const eg=document.getElementById('btn-export-gen'); if(eg){eg.disabled=true; eg.textContent='▶ Generate';}
+  ['detection','clustering','keypoints','pnlcalib','pose'].forEach(s=>{const b=document.getElementById('dl-'+s); if(b)b.disabled=true;});
+  const pe=document.getElementById('prog-export'); if(pe)pe.style.display='none';
+  const se=document.getElementById('status-export'); if(se)se.textContent='';
+  const rec=document.getElementById('btn-record-mp4'); if(rec)rec.disabled=true;
+  _setStatus('idle','IDLE');
+
+  // Job tracking
+  _currentJobId=null; sessionStorage.removeItem('forma_job_id');
+  if(window.BT&&window.BT.reset)window.BT.reset();
+  closePlayerMenu(); if(window.closeMeshTeamPopup)window.closeMeshTeamPopup();
+}
+
+async function uploadVideo(input){
+  const file=input?.files?.[0];if(!file)return;
+  resetDashboard();
+  const isImg=/\.(jpe?g|png|bmp|webp)$/i.test(file.name);
+  _inputIsImage=isImg;
+  const vid=document.getElementById('vid');
+  const vimg=document.getElementById('vid-img');
+  if(isImg){
+    // Still image: the <video> element can't decode it, so show it in an
+    // <img> instead. _videoReady stays false so syncVideo() is a no-op and
+    // the one-frame result renders a static 3D scene.
+    if(vimg){vimg.src=URL.createObjectURL(file);vimg.style.display='block';}
+    vid.style.display='none';vid.removeAttribute('src');
+    _videoReady=false;
+  }else{
+    if(vimg){vimg.style.display='none';vimg.removeAttribute('src');}
+    vid.src=URL.createObjectURL(file);vid.style.display='block';
+    _videoReady=false;
+    vid.onloadedmetadata=()=>{_videoReady=true;};
+  }
+  document.getElementById('vid-overlay').style.display='none';
+  document.getElementById('vid-status').textContent=file.name;
+  _videoFile=file;
+  _showOverlay(isImg?'Analyzing Image':'Analyzing Video','PIPELINE','Uploading…',0);
+  _setStatus('processing','UPLOADING');
+  try{
+    const fd=new FormData();fd.append('video',file);
+    const res=await fetch('/process',{method:'POST',body:fd});
+    if(!res.ok)throw new Error(res.status+' '+await res.text());
+    const data=await res.json();
+    _currentJobId=data.job_id;
+    sessionStorage.setItem('forma_job_id', data.job_id);
+    _updateOverlay('Processing frames…',2,'');
+    _setStatus('processing','PROCESSING');
+    _pollPipeline();
+  }catch(err){
+    _hideOverlay();_setStatus('error','ERROR');
+    _showToast('Upload failed: '+err.message,8000);
+  }
+}
+
+function _pollPipeline(){
+  clearInterval(_pollTimer);
+  _pollTimer=setInterval(async()=>{
+    try{
+      const d=await(await fetch('/status/'+_currentJobId)).json();
+      const p=d.progress||{};
+      const stageMsg = d.status==='processing' ? (p.stage||'Running pipeline…') : d.status;
+      const statsMsg = (p.total>0) ? 'Frame '+p.frame+' / '+p.total : '';
+      _updateOverlay(stageMsg, p.percent||0, statsMsg);
+      if(d.status==='done'){clearInterval(_pollTimer);_onPipelineDone();}
+      if(d.status==='error'){clearInterval(_pollTimer);_hideOverlay();_setStatus('error','ERROR');_showToast('Pipeline error: '+(d.error||'unknown'),10000);}
+    }catch(e){}
+  },1200);
+}
+
+async function _onPipelineDone(){
+  _updateOverlay('Done — loading result…',100,'');
+  _setStatus('done','DONE');
+  try{
+    const data=await(await fetch('/result/'+_currentJobId)).json();
+    loadTacticalData(data);
+    document.getElementById('empty-3d').style.display='none';
+    _setExportReady(true);
+    document.getElementById('btn-export-gen').disabled = false;
+  }catch(e){_showToast('Could not load result JSON: '+e.message,8000);}
+  _hideOverlay();
+  const btn=document.getElementById('btn-gen-mesh');
+  btn.style.display='';btn.className='tool-btn mesh-ready';
+  btn.textContent='⬡ Generate Meshes';btn.disabled=false;
+  _showToast('Pipeline done. Export videos available.',6000);
+}
+
+async function startMeshLift(){
+  if(!_currentJobId){_showToast('Upload a video first.',4000);return;}
+  const btn=document.getElementById('btn-gen-mesh');
+  btn.className='tool-btn mesh-busy';btn.innerHTML='<span class="spin">⬡</span> Generating…';btn.disabled=true;
+  _showOverlay('Building SMPL-X Meshes','GVHMR LIFT','Starting GVHMR…',0);
+  _setStatus('processing','GVHMR');
+  try{
+    const res=await fetch('/process-mesh/'+_currentJobId,{method:'POST'});
+    if(!res.ok)throw new Error(res.status+' '+await res.text());
+    const{mesh_job_id}=await res.json();
+    _pollMeshLift(mesh_job_id);
+  }catch(err){
+    _hideOverlay();_setStatus('error','ERROR');
+    btn.className='tool-btn mesh-ready';btn.innerHTML='⬡ Generate Meshes';btn.disabled=false;
+    _showToast('Mesh lift failed: '+err.message,8000);
+  }
+}
+
+function _pollMeshLift(meshJobId){
+  clearInterval(_pollTimer);
+  _pollTimer=setInterval(async()=>{
+    try{
+      const d=await(await fetch('/status-mesh/'+meshJobId)).json();
+      const p=d.progress||{};
+      const stageMsg = p.stage||'Running GVHMR…';
+      const statsMsg = (p.total_tracks>0) ? 'Track '+p.track+' / '+p.total_tracks : '';
+      _updateOverlay(stageMsg, p.percent||0, statsMsg);
+      if(d.status==='done'){clearInterval(_pollTimer);_onMeshLiftDone(meshJobId);}
+      if(d.status==='error'){
+        clearInterval(_pollTimer);_hideOverlay();_setStatus('error','ERROR');
+        const btn=document.getElementById('btn-gen-mesh');
+        btn.className='tool-btn mesh-ready';btn.innerHTML='⬡ Generate Meshes';btn.disabled=false;
+        _showToast('GVHMR error: '+(d.error||'unknown'),10000);
+      }
+    }catch(e){}
+  },2000);
+}
+
+async function _onMeshLiftDone(meshJobId){
+  _updateOverlay('Meshes ready — loading…',100,'');_setStatus('done','DONE');
+  try{
+    const data=await(await fetch('/result-mesh/'+meshJobId)).json();
+    switchTab('mesh');
+    setTimeout(()=>{loadMeshData(data);document.getElementById('mesh-info').textContent=meshJobId+' loaded';document.getElementById('empty-mesh').style.display='none';},300);
+    const btn=document.getElementById('btn-gen-mesh');
+    btn.className='tool-btn';btn.innerHTML='⬡ Meshes loaded';btn.disabled=true;
+  }catch(e){_showToast('Could not load mesh JSON: '+e.message,8000);}
+  _hideOverlay();
+}
+
+function openResultJson(input){
+  const file=input?.files?.[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      loadTacticalData(JSON.parse(r.result));
+      document.getElementById('empty-3d').style.display='none';
+      _setExportReady(true);
+      document.getElementById('btn-export-gen').disabled = false;
+    }catch(e){_showToast('JSON parse error: '+e.message,6000);}
+  };
+  r.readAsText(file);input.value='';
+}
+function openMeshJsonFile(input){
+  const file=input?.files?.[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{switchTab('mesh');setTimeout(()=>{loadMeshData(JSON.parse(r.result));document.getElementById('empty-mesh').style.display='none';},300);}
+    catch(e){_showToast('JSON parse error: '+e.message,6000);}
+  };
+  r.readAsText(file);input.value='';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SERVER-SIDE VIDEO EXPORT
+// ═══════════════════════════════════════════════════════════════════════════
+let _exportPollTimer = null;
+
+async function startServerExport() {
+  if (!_currentJobId) { _showToast('No pipeline job — upload a video first.', 4000); return; }
+  const genBtn = document.getElementById('btn-export-gen');
+  genBtn.disabled = true; genBtn.textContent = '▶ Rendering…';
+  document.getElementById('prog-export').style.display = 'block';
+  document.getElementById('bar-export').style.width = '0%';
+  document.getElementById('status-export').textContent = 'Starting…';
+
+  try {
+    const res = await fetch('/export/' + _currentJobId, { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    const { export_id } = await res.json();
+    _pollExport(export_id);
+  } catch(e) {
+    genBtn.disabled = false; genBtn.textContent = '▶ Generate';
+    document.getElementById('status-export').textContent = 'Error: ' + e.message;
+  }
+}
+
+function _pollExport(expId) {
+  clearInterval(_exportPollTimer);
+  _exportPollTimer = setInterval(async () => {
+    try {
+      const d = await (await fetch('/status-export/' + expId)).json();
+      const p = d.progress || {};
+      const pct = p.percent || 0;
+      document.getElementById('bar-export').style.width = pct + '%';
+      document.getElementById('status-export').textContent =
+        p.stage ? `Stage: ${p.stage}  frame ${p.done||0}/${p.total||0}  (${pct.toFixed(0)}%)` : (d.status);
+      if (d.status === 'done') {
+        clearInterval(_exportPollTimer);
+        document.getElementById('btn-export-gen').textContent = '✓ Done';
+        document.getElementById('status-export').textContent = 'All videos ready — download below';
+        // Enable all download buttons
+        ['detection','clustering','keypoints','pnlcalib','pose'].forEach(s => {
+          document.getElementById('dl-' + s).disabled = false;
+        });
+      } else if (d.status === 'error') {
+        clearInterval(_exportPollTimer);
+        document.getElementById('btn-export-gen').disabled = false;
+        document.getElementById('btn-export-gen').textContent = '▶ Retry';
+        document.getElementById('status-export').textContent = 'Error: ' + (d.error || 'unknown');
+      }
+    } catch(e) {}
+  }, 1500);
+}
+
+function dlStage(stage) {
+  if (!_currentJobId) return;
+  window.location.href = '/download-export/' + _currentJobId + '/' + stage;
+}
+
+// COCO 17-keypoint skeleton connections
+const POSE_BONES = [
+  [5,6],[5,7],[7,9],[6,8],[8,10],         // shoulders, arms
+  [5,11],[6,12],[11,12],                   // torso
+  [11,13],[13,15],[12,14],[14,16]          // legs
+];
+const POSE_KP_COLORS = [
+  '#ff6b6b','#ff6b6b',                    // nose, eyes (0-1)
+  '#ffa94d','#ffa94d',                    // ears (2-3)
+  '#a9e34b','#a9e34b',                    // shoulders (4-5)  [COCO 0-idx: 0=nose]
+  '#69db7c','#69db7c',                    // elbows
+  '#4dabf7','#4dabf7',                    // wrists
+  '#f783ac','#f783ac',                    // hips
+  '#cc5de8','#cc5de8',                    // knees
+  '#ff6b6b','#ff6b6b'                     // ankles
+];
+
+// Minimap pitch dimensions (2D bird-eye for PnLCalib video)
+const MM_W = 210, MM_H = 136, MM_PAD = 10;
+
+function _pitchMapCoord(px, py, vw, vh, pitchW, pitchH) {
+  // pixel on full-res frame → minimap pixel
+  const scaleX = MM_W / pitchW, scaleY = MM_H / pitchH;
+  return [MM_PAD + px * scaleX, MM_PAD + py * scaleY];
+}
+
+function _drawBbox(ctx, x1, y1, x2, y2, color, label, lw) {
+  ctx.strokeStyle = color; ctx.lineWidth = lw || 2;
+  ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+  if (label) {
+    ctx.font = `bold ${Math.max(10, (y2-y1)*0.13)|0}px Arial`;
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = color;
+    ctx.fillRect(x1, y1-18, tw+8, 18);
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, x1+4, y1-5);
+  }
+}
+
+function _kindColor(kind) {
+  if (kind==='referee') return document.getElementById('colR').value;
+  if (kind==='goalkeeper') return '#00E5A0';
+  if (kind==='ball') return '#ffffff';
+  return '#60a5fa';
+}
+function _teamColor(team) {
+  if (team===0) return document.getElementById('colA').value;
+  if (team===1) return document.getElementById('colB').value;
+  return '#888888';
+}
+
+// Draw pitch keypoints + line segments onto ctx (broadcast coords)
+function _drawKeypoints(ctx, kpts, scale) {
+  const KP_COLORS = ['#ff5000','#00c8ff','#ffc800','#00ff64','#c800ff','#ff0064','#0064ff','#64ff00','#ff9696','#96ff96','#9696ff','#ffff00','#00ffff','#ff00ff','#c8c8c8','#ff8000','#8000ff','#00ff80','#ff0080','#0080ff','#b45050','#50b450','#5050b4','#c89600','#00c896','#9600c8','#64c864','#c86464','#6464c8','#ffff80'];
+  (kpts||[]).forEach(k => {
+    const px = k.pixel[0]*scale, py = k.pixel[1]*scale;
+    const c = KP_COLORS[k.idx % KP_COLORS.length];
+    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI*2);
+    ctx.fillStyle=c; ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 9px Arial'; ctx.textAlign='left';
+    ctx.fillText(k.idx, px+8, py-7);
+  });
+}
+
+// Draw ViTPose 17-point skeleton
+function _drawSkeleton(ctx, kpts, scale, color) {
+  if (!kpts || kpts.length < 17) return;
+  const pts = kpts.map(k => [k[0]*scale, k[1]*scale, k[2]]);
+  ctx.lineWidth = 2;
+  POSE_BONES.forEach(([a,b]) => {
+    if (pts[a][2] < 0.3 || pts[b][2] < 0.3) return;
+    ctx.beginPath(); ctx.moveTo(pts[a][0], pts[a][1]); ctx.lineTo(pts[b][0], pts[b][1]);
+    ctx.strokeStyle = color+'aa'; ctx.stroke();
+  });
+  pts.forEach((p, i) => {
+    if (p[2] < 0.3) return;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, Math.PI*2);
+    ctx.fillStyle = POSE_KP_COLORS[i] || '#fff'; ctx.fill();
+  });
+}
+
+// Draw 2D pitch minimap (bottom-right corner inset)
+function _drawMinimap(ctx, frame, canvasW, canvasH, pitchW, pitchH, colA, colB) {
+  const mx = canvasW - MM_W - MM_PAD*2 - 10;
+  const my = canvasH - MM_H - MM_PAD*2 - 10;
+  const mw = MM_W + MM_PAD*2, mh = MM_H + MM_PAD*2;
+
+  // Background
+  ctx.fillStyle = 'rgba(15,23,42,.88)';
+  ctx.beginPath(); ctx.roundRect(mx, my, mw, mh, 6); ctx.fill();
+  ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(mx, my, mw, mh, 6); ctx.stroke();
+
+  // Grass
+  ctx.fillStyle = '#267026';
+  ctx.fillRect(mx+MM_PAD, my+MM_PAD, MM_W, MM_H);
+
+  // Pitch lines (simplified)
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1;
+  const ox = mx+MM_PAD, oy = my+MM_PAD;
+  const sx = MM_W/pitchW, sy = MM_H/pitchH;
+  const ln = (ax,ay,bx,by) => { ctx.beginPath(); ctx.moveTo(ox+ax*sx, oy+ay*sy); ctx.lineTo(ox+bx*sx, oy+by*sy); ctx.stroke(); };
+  const rc = (x,y,w,h)    => { ctx.strokeRect(ox+x*sx, oy+y*sy, w*sx, h*sy); };
+  ln(0,0,pitchW,0); ln(pitchW,0,pitchW,pitchH); ln(pitchW,pitchH,0,pitchH); ln(0,pitchH,0,0);
+  ln(pitchW/2,0,pitchW/2,pitchH);
+  rc(0,(pitchH-40.32)/2,16.5,40.32); rc(pitchW-16.5,(pitchH-40.32)/2,16.5,40.32);
+  ctx.beginPath(); ctx.arc(ox+pitchW/2*sx, oy+pitchH/2*sy, 9.15*sx, 0, Math.PI*2); ctx.stroke();
+
+  // Players
+  (frame.players||[]).forEach(p => {
+    if (!p.pitch_pos) return;
+    const px = ox + p.pitch_pos[0]*sx, py = oy + p.pitch_pos[1]*sy;
+    let col = '#888';
+    if (p.kind==='referee') col = '#FFD400';
+    else if (p.kind==='goalkeeper') col = '#00E5A0';
+    else if (p.team===0) col = colA;
+    else if (p.team===1) col = colB;
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.fill();
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 0.5; ctx.stroke();
+  });
+  // Ball
+  if (frame.ball?.pitch_pos) {
+    const bx = ox+frame.ball.pitch_pos[0]*sx, by = oy+frame.ball.pitch_pos[1]*sy;
+    ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill(); ctx.strokeStyle='#000'; ctx.lineWidth=0.5; ctx.stroke();
+  }
+}
+
+// Frame draw functions per export type
+function _drawDetection(ctx, frame, scale) {
+  (frame.players||[]).forEach(p => {
+    const [x1,y1,x2,y2] = p.bbox.map(v=>v*scale);
+    const col = _kindColor(p.kind);
+    _drawBbox(ctx, x1, y1, x2, y2, col, '#'+p.id+' '+p.kind, 2);
+  });
+  if (frame.ball?.bbox) {
+    const [x1,y1,x2,y2] = frame.ball.bbox.map(v=>v*scale);
+    _drawBbox(ctx, x1, y1, x2, y2, '#ffffff', 'ball', 2);
+  }
+}
+
+function _drawClustering(ctx, frame, scale, colA, colB) {
+  (frame.players||[]).forEach(p => {
+    const [x1,y1,x2,y2] = p.bbox.map(v=>v*scale);
+    let col;
+    if (p.kind==='referee') col='#FFD400';
+    else if (p.kind==='goalkeeper') col='#00E5A0';
+    else col = _teamColor(p.team);
+    const teamLabel = p.kind==='referee'?'REF':p.kind==='goalkeeper'?'GK':(p.team===0?'A':p.team===1?'B':'?');
+    _drawBbox(ctx, x1, y1, x2, y2, col, '#'+p.id+' '+teamLabel, 2);
+  });
+  if (frame.ball?.bbox) {
+    const [x1,y1,x2,y2] = frame.ball.bbox.map(v=>v*scale);
+    _drawBbox(ctx, x1, y1, x2, y2, '#ffffff', 'ball', 2);
+  }
+}
+
+function _drawKeypointsOnly(ctx, frame, scale) {
+  _drawKeypoints(ctx, frame.pitch_keypoints, scale);
+  const n = (frame.pitch_keypoints||[]).length;
+  ctx.fillStyle = 'rgba(0,0,0,.6)';
+  ctx.beginPath(); ctx.roundRect(8, 8, 160, 24, 4); ctx.fill();
+  ctx.fillStyle = n>=4?'#00ff88':'#ff8800'; ctx.font = 'bold 12px Arial'; ctx.textAlign='left';
+  ctx.fillText('Keypoints: '+n+(n>=4?' ✓':' ⚠'), 12, 24);
+}
+
+function _drawPnlcalib(ctx, frame, scale, canvasW, canvasH, pitchW, pitchH, colA, colB) {
+  _drawKeypoints(ctx, frame.pitch_keypoints, scale);
+  (frame.players||[]).forEach(p => {
+    if (!p.pitch_pos) return;
+    const [x1,y1,x2,y2] = p.bbox.map(v=>v*scale);
+    let col;
+    if (p.kind==='referee') col='#FFD400';
+    else if (p.kind==='goalkeeper') col='#00E5A0';
+    else col = p.team===0?colA:colB;
+    _drawBbox(ctx, x1, y1, x2, y2, col, '#'+p.id, 2);
+  });
+  const homo = frame.homography_available;
+  ctx.fillStyle = homo?'rgba(16,185,129,.15)':'rgba(239,68,68,.1)';
+  ctx.beginPath(); ctx.roundRect(8, 8, 130, 24, 4); ctx.fill();
+  ctx.fillStyle = homo?'#10b981':'#ef4444'; ctx.font='bold 11px Arial'; ctx.textAlign='left';
+  ctx.fillText('Homography: '+(homo?'OK':'NO'), 12, 24);
+  if (homo) _drawMinimap(ctx, frame, canvasW, canvasH, pitchW, pitchH, colA, colB);
+}
+
+function _drawPose(ctx, frame, scale) {
+  (frame.players||[]).forEach(p => {
+    if (p.kind==='ball') return;
+    const [x1,y1,x2,y2] = p.bbox.map(v=>v*scale);
+    const col = _kindColor(p.kind);
+    _drawBbox(ctx, x1, y1, x2, y2, col, '#'+p.id, 1.5);
+    if (p.kpts) _drawSkeleton(ctx, p.kpts, scale, col);
+  });
+}
+
+// Main export function
+async function startExport(type) {
+  if (!tacFrameData) { _showToast('Load a result JSON first.', 4000); return; }
+  const vid = document.getElementById('vid');
+  if (!vid.src || vid.readyState < 1) { _showToast('Source video must be loaded in the player.', 5000); return; }
+
+  const btn    = document.getElementById('btn-'+type);
+  const progEl = document.getElementById('prog-'+type);
+  const barEl  = document.getElementById('bar-'+type);
+  const statEl = document.getElementById('status-'+type);
+
+  btn.disabled = true;
+  progEl.style.display = 'block';
+  barEl.style.width = '0%';
+  statEl.textContent = 'Starting…';
+
+  const meta    = tacFrameData.metadata;
+  const frames  = tacFrameData.frames;
+  const vidW    = meta.width  || 1920;
+  const vidH    = meta.height || 1080;
+  const fps     = meta.playback_fps || 25;
+  const pitchW  = meta.pitch_width  || 105;
+  const pitchH  = meta.pitch_height || 68;
+  const colA    = document.getElementById('colA').value;
+  const colB    = document.getElementById('colB').value;
+
+  // We render at half resolution to keep encoder happy
+  const outW = Math.min(vidW, 1280);
+  const outH = Math.round(outW * vidH / vidW);
+  const scale = outW / vidW;
+
+  // Create off-screen canvas for rendering
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+
+  // Check MediaRecorder support
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9'
+    : 'video/webm';
+
+  const stream   = canvas.captureStream(fps);
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+  const chunks   = [];
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: mimeType });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `forma_${type}_${Date.now()}.webm`;
+    a.click();
+    URL.revokeObjectURL(url);
+    btn.disabled = false;
+    progEl.style.display = 'none';
+    statEl.textContent = 'Done — downloaded';
+  };
+
+  recorder.start();
+
+  // Pause the dashboard video while exporting
+  const wasPlaying = !vid.paused;
+  vid.pause();
+
+  let aborted = false;
+  btn.textContent = 'Cancel';
+  btn.disabled = false;
+  btn.onclick = () => { aborted = true; };
+
+  for (let i = 0; i < frames.length; i++) {
+    if (aborted) break;
+    const f = frames[i];
+
+    // Seek video to this frame's timestamp
+    await new Promise(resolve => {
+      const onSeeked = () => { vid.removeEventListener('seeked', onSeeked); resolve(); };
+      vid.addEventListener('seeked', onSeeked);
+      vid.currentTime = f.timestamp;
+      setTimeout(resolve, 200); // fallback if seeked never fires
+    });
+
+    // Draw base video frame
+    ctx.drawImage(vid, 0, 0, outW, outH);
+
+    // Draw stage-specific overlay
+    if      (type==='detection')  _drawDetection(ctx, f, scale);
+    else if (type==='clustering') _drawClustering(ctx, f, scale, colA, colB);
+    else if (type==='keypoints')  _drawKeypointsOnly(ctx, f, scale);
+    else if (type==='pnlcalib')   _drawPnlcalib(ctx, f, scale, outW, outH, pitchW, pitchH, colA, colB);
+    else if (type==='pose')       _drawPose(ctx, f, scale);
+
+    // Frame label
+    ctx.fillStyle='rgba(0,0,0,.55)';
+    ctx.fillRect(outW-100, outH-22, 100, 22);
+    ctx.fillStyle='#94a3b8'; ctx.font='10px IBM Plex Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText('f '+f.frame_idx+' | '+f.timestamp.toFixed(2)+'s', outW-4, outH-7);
+
+    // Hold frame for one tick so MediaRecorder captures it
+    await new Promise(r => setTimeout(r, 1000/fps));
+
+    const pct = Math.round((i+1)/frames.length*100);
+    barEl.style.width = pct+'%';
+    statEl.textContent = `Frame ${i+1} / ${frames.length}`;
+  }
+
+  recorder.stop();
+  if (wasPlaying) vid.play();
+  btn.textContent = 'Download';
+  btn.onclick = () => startExport(type);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TACTICAL ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+const tacCanvas = document.getElementById('c');
+const tacRen = new THREE.WebGLRenderer({canvas:tacCanvas,antialias:true,preserveDrawingBuffer:true});
+tacRen.setPixelRatio(Math.min(devicePixelRatio,2));
+tacRen.shadowMap.enabled=true;tacRen.setClearColor(0x0f172a);
+const tacScene=new THREE.Scene();tacScene.fog=new THREE.Fog(0x0f172a,100,160);
+const tacCam=new THREE.PerspectiveCamera(50,1,0.1,300);tacCam.position.set(0,35,50);
+const tacCtrl=new THREE.OrbitControls(tacCam,tacCanvas);
+tacCtrl.enableDamping=true;tacCtrl.dampingFactor=0.07;tacCtrl.maxPolarAngle=Math.PI/2.02;
+tacScene.add(new THREE.AmbientLight(0xffffff,0.7));
+const tacSun=new THREE.DirectionalLight(0xfff8e0,1.0);
+tacSun.position.set(10,30,10);tacSun.castShadow=true;
+tacSun.shadow.mapSize.set(2048,2048);tacSun.shadow.camera.left=tacSun.shadow.camera.bottom=-70;
+tacSun.shadow.camera.right=tacSun.shadow.camera.top=70;tacScene.add(tacSun);
+const tacHemi=new THREE.HemisphereLight(0xbfd8ff,0x3a5a2e,0);tacScene.add(tacHemi);
+
+let PW=105,PH=68;
+function wp(x,y){return[x-PW/2,y-PH/2];}
+const BOX_D=16.5,BOX_W=40.32,GBOX_D=5.5,GBOX_W=18.32,SPOT=11,CIRC=9.15;
+
+function buildCartoonPitch(){
+  const g=new THREE.Group();g.name='pitchC';
+  for(let i=0;i<10;i++){const m=new THREE.Mesh(new THREE.PlaneGeometry(PW/10,PH),new THREE.MeshLambertMaterial({color:i%2?0x267026:0x2d7a2d}));m.rotation.x=-Math.PI/2;m.receiveShadow=true;m.position.set(-PW/2+PW/20+i*PW/10,0,0);g.add(m);}
+  const lm=new THREE.LineBasicMaterial({color:0xffffff});
+  const ln=pts=>g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x,z])=>new THREE.Vector3(x,.02,z))),lm));
+  const rc=(cx,cz,w,h)=>{const hw=w/2,hh=h/2;ln([[cx-hw,cz-hh],[cx+hw,cz-hh],[cx+hw,cz+hh],[cx-hw,cz+hh],[cx-hw,cz-hh]]);};
+  const ci=(cx,cz,r)=>{const p=[];for(let i=0;i<=64;i++){const a=i/64*Math.PI*2;p.push([cx+Math.cos(a)*r,cz+Math.sin(a)*r]);}ln(p);};
+  const dt=(x,z)=>{const m=new THREE.Mesh(new THREE.CircleGeometry(.3,16),new THREE.MeshBasicMaterial({color:0xffffff}));m.rotation.x=-Math.PI/2;m.position.set(x,.03,z);g.add(m);};
+  ln([wp(0,0),wp(PW,0),wp(PW,PH),wp(0,PH),wp(0,0)]);ln([wp(PW/2,0),wp(PW/2,PH)]);
+  ci(...wp(PW/2,PH/2),CIRC);dt(...wp(PW/2,PH/2));
+  rc(...wp(BOX_D/2,PH/2),BOX_D,BOX_W);rc(...wp(GBOX_D/2,PH/2),GBOX_D,GBOX_W);dt(...wp(SPOT,PH/2));
+  rc(...wp(PW-BOX_D/2,PH/2),BOX_D,BOX_W);rc(...wp(PW-GBOX_D/2,PH/2),GBOX_D,GBOX_W);dt(...wp(PW-SPOT,PH/2));
+  tacScene.add(g);return g;
+}
+let tacPitch=buildCartoonPitch(),tacWorld='cartoon';
+
+function makeMannequin(color){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshLambertMaterial({color}),skn=new THREE.MeshLambertMaterial({color:0xf0c8a0}),drk=new THREE.MeshLambertMaterial({color:0x1a2535}),blk=new THREE.MeshLambertMaterial({color:0x111111});
+  const p=(geo,m,x,y,z)=>{const me=new THREE.Mesh(geo,m);me.position.set(x,y,z);me.castShadow=true;g.add(me);};
+  p(new THREE.CylinderGeometry(.115,.1,.46,10),mat,0,.43,0);
+  p(new THREE.CylinderGeometry(.06,.07,.1,8),skn,0,.70,0);
+  p(new THREE.SphereGeometry(.135,12,10),skn,0,.83,0);
+  const aL=new THREE.Mesh(new THREE.CylinderGeometry(.05,.045,.34,7),mat);aL.position.set(-.17,.52,0);aL.rotation.z=.5;aL.castShadow=true;g.add(aL);
+  const aR=new THREE.Mesh(new THREE.CylinderGeometry(.05,.045,.34,7),mat);aR.position.set(.17,.52,0);aR.rotation.z=-.5;aR.castShadow=true;g.add(aR);
+  p(new THREE.CylinderGeometry(.06,.055,.32,8),drk,-.07,.16,0);
+  p(new THREE.CylinderGeometry(.06,.055,.32,8),drk,.07,.16,0);
+  p(new THREE.BoxGeometry(.1,.06,.16),blk,-.07,.03,.04);
+  p(new THREE.BoxGeometry(.1,.06,.16),blk,.07,.03,.04);
+  const sdw=new THREE.Mesh(new THREE.CircleGeometry(.25,16),new THREE.MeshBasicMaterial({color:0,opacity:.3,transparent:true}));sdw.rotation.x=-Math.PI/2;sdw.position.y=.001;g.add(sdw);
+  const mk=new THREE.Group();mk.name='marker';
+  const _mg=window.__mqGlow||(window.__mqGlow=(function(){const cc=document.createElement('canvas');cc.width=cc.height=128;const gg=cc.getContext('2d');const gr=gg.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.55,'rgba(255,255,255,.5)');gr.addColorStop(1,'rgba(255,255,255,0)');gg.fillStyle=gr;gg.fillRect(0,0,128,128);return new THREE.CanvasTexture(cc);})());
+  const mkGlow=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.7),new THREE.MeshBasicMaterial({map:_mg,color,transparent:true,opacity:.6,depthWrite:false,blending:THREE.AdditiveBlending}));mkGlow.rotation.x=-Math.PI/2;mkGlow.position.y=.05;mk.add(mkGlow);
+  const mkRing=new THREE.Mesh(new THREE.RingGeometry(.46,.58,40),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.95,depthWrite:false,side:THREE.DoubleSide}));mkRing.rotation.x=-Math.PI/2;mkRing.position.y=.06;mk.add(mkRing);
+  g.add(mk);
+  const cv=document.createElement('canvas');cv.width=64;cv.height=32;
+  const ltex=new THREE.CanvasTexture(cv);
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:ltex,transparent:true,depthTest:false}));spr.scale.set(2.5,1.2,1);spr.position.y=3.5;spr.name='label';g.add(spr);
+  g.userData={ltex,lctx:cv.getContext('2d'),color,target:new THREE.Vector3()};
+  g.scale.set(2,2,2);g.visible=false;tacScene.add(g);return g;
+}
+function setLabel(g,id){const{lctx,ltex}=g.userData;lctx.clearRect(0,0,64,32);lctx.fillStyle='#fff';lctx.font='bold 18px Arial';lctx.textAlign='center';lctx.fillText('#'+id,32,22);ltex.needsUpdate=true;}
+function recolorMannequin(g,hex){g.traverse(c=>{if(!c.isMesh)return;const v=c.material.color?c.material.color.getHex():-1;if(v!==0xf0c8a0&&v!==0x1a2535&&v!==0x111111&&v!==0)if(c.material.color)c.material.color.setHex(hex);});g.userData.color=hex;}
+
+const tacPools={cartoon:{},realistic:{}};let tacPool=tacPools.cartoon;
+const tacTrails={},teamMap={};
+const tacBall=(()=>{const m=new THREE.Mesh(new THREE.SphereGeometry(0.6,16,12),new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x555555}));m.castShadow=true;m.visible=false;m.userData={target:new THREE.Vector3()};tacScene.add(m);return m;})();
+
+function playerColor(id,kind){if(kind==='referee')return parseInt(document.getElementById('colR').value.slice(1),16);if(kind==='goalkeeper')return 0x00E5A0;const team=teamMap[id]||(Number(id)%2===0?'A':'B');return team==='A'?parseInt(document.getElementById('colA').value.slice(1),16):parseInt(document.getElementById('colB').value.slice(1),16);}
+function getTacPlayer(id,kind){if(!tacPool[id]){const color=playerColor(id,kind);tacPool[id]=makeMannequin(color);tacPool[id].userData.kind=kind||'player';setLabel(tacPool[id],id);}return tacPool[id];}
+function addTrail(id,wx,wz){if(!tacTrails[id]){const team=teamMap[id]||(Number(id)%2===0?'A':'B');const color=team==='A'?parseInt(document.getElementById('colA').value.slice(1),16):parseInt(document.getElementById('colB').value.slice(1),16);const line=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color,opacity:.6,transparent:true}));tacScene.add(line);tacTrails[id]={pts:[],line};}const t=tacTrails[id];t.pts.push(new THREE.Vector3(wx,.1,wz));if(t.pts.length>60)t.pts.shift();t.line.geometry.dispose();t.line.geometry=new THREE.BufferGeometry().setFromPoints(t.pts);}
+function toggleIds(on){Object.values(tacPool).forEach(m=>{const l=m.getObjectByName('label');if(l)l.visible=on;});}
+function toggleTrails(on){Object.values(tacTrails).forEach(t=>t.line.visible=on);}
+function toggleMarkers(on){Object.values(tacPool).forEach(m=>{const mk=m.getObjectByName('marker');if(mk)mk.visible=on;});}
+function applyColors(){
+  const cA=parseInt(document.getElementById('colA').value.slice(1),16),cB=parseInt(document.getElementById('colB').value.slice(1),16),cR=parseInt(document.getElementById('colR').value.slice(1),16);
+  // Tactical tab
+  Object.keys(tacPool).forEach(id=>{
+    const k=tacPool[id].userData.kind;
+    if(k==='referee'){recolorMannequin(tacPool[id],cR);return;}
+    if(k!=='player')return;
+    const team=teamMap[id]||(Number(id)%2===0?'A':'B');const hex=team==='A'?cA:cB;recolorMannequin(tacPool[id],hex);if(tacTrails[id])tacTrails[id].line.material.color.setHex(hex);
+  });
+  // Mesh tab — respect per-track overrides
+  meshTeamHexes.A=document.getElementById('colA').value;
+  meshTeamHexes.B=document.getElementById('colB').value;
+  for(const tid of Object.keys(meshTrackRecs)){meshTrackRecs[tid].mesh.material.color=_meshTeamColorForTrack(+tid);meshTrackRecs[tid].mesh.material.needsUpdate=true;}
+}
+function setWorld(w){tacWorld=w;document.getElementById('mode-cartoon').classList.toggle('active',w==='cartoon');document.getElementById('mode-realistic').classList.toggle('active',w==='realistic');}
+
+let _videoFile=null,_videoReady=false,_inputIsImage=false;
+function syncVideo(ts){if(!_videoReady||_inputIsImage)return;const vid=document.getElementById('vid');if(Math.abs(vid.currentTime-ts)>.15)vid.currentTime=ts;}
+
+let tacFrameData=null,tacCurFrame=0,tacPlaying=false,tacSpeed=1,tacLastTick=0,tacFps=10;
+
+function loadTacticalData(data){
+  tacFrameData=data;tacFps=data.metadata.playback_fps||10;tacCurFrame=0;
+  const npw=data.metadata.pitch_width||105,nph=data.metadata.pitch_height||68;
+  if(npw!==PW||nph!==PH){PW=npw;PH=nph;tacScene.remove(tacPitch);tacPitch=buildCartoonPitch();}
+  Object.keys(teamMap).forEach(k=>delete teamMap[k]);
+  data.frames.forEach(f=>f.players.forEach(p=>{if(p.id>=0&&(p.team===0||p.team===1))teamMap[String(p.id)]=p.team===0?'A':'B';}));
+  const kc=data.metadata.teams&&data.metadata.teams.kit_colors;
+  if(kc&&kc.length===2){document.getElementById('colA').value=kc[0];document.getElementById('colB').value=kc[1];document.getElementById('swA').style.background=kc[0];document.getElementById('swB').style.background=kc[1];}
+  const rc=data.metadata.teams&&data.metadata.teams.referee_color;
+  if(rc){document.getElementById('colR').value=rc;document.getElementById('swR').style.background=rc;}
+  Object.values(tacPools.cartoon).forEach(m=>tacScene.remove(m));tacPools.cartoon={};
+  Object.keys(tacTrails).forEach(id=>{tacScene.remove(tacTrails[id].line);delete tacTrails[id];});
+  tacPool=tacPools[tacWorld];
+  tacPlaying=true;document.getElementById('play-btn').textContent='⏸';
+  document.getElementById('time-lbl').textContent='0.0s / '+data.metadata.duration.toFixed(1)+'s';
+  tacRenderFrame(0);
+}
+
+function tacRenderFrame(idx){
+  if(!tacFrameData||idx>=tacFrameData.frames.length)return;
+  const f=tacFrameData.frames[idx];
+  const showTr=document.getElementById('sw-trails').checked,showID=document.getElementById('sw-ids').checked;
+  let mapped=0,total=f.players.length;
+  if(!f.homography_available){
+    Object.values(tacPool).forEach(m=>m.visible=false);tacBall.visible=false;
+    Object.values(tacTrails).forEach(t=>t.line.visible=showTr);syncVideo(f.timestamp);
+    document.getElementById('h-frame').textContent=idx+1;document.getElementById('h-time').textContent=f.timestamp.toFixed(2);
+    document.getElementById('h-players').textContent='0/'+total;document.getElementById('h-homo').textContent='NO';
+    document.getElementById('time-lbl').textContent=f.timestamp.toFixed(1)+'s / '+tacFrameData.metadata.duration.toFixed(1)+'s';
+    document.getElementById('tl-fill').style.width=(idx/Math.max(tacFrameData.frames.length-1,1)*100)+'%';
+    return;
+  }
+  const active=new Set();
+  f.players.forEach(p=>{
+    const id=p.id<0?'u'+Math.abs(p.id):String(p.id);active.add(id);if(!p.pitch_pos)return;mapped++;
+    const wx=p.pitch_pos[0]-PW/2,wz=p.pitch_pos[1]-PH/2;
+    const m=getTacPlayer(id,p.kind);
+    if(p.kind==='player'&&(p.team===0||p.team===1)){const tm=p.team===0?'A':'B';if(m.userData.teamCur!==tm){m.userData.teamCur=tm;const hex=parseInt(document.getElementById(tm==='A'?'colA':'colB').value.slice(1),16);recolorMannequin(m,hex);if(tacTrails[id])tacTrails[id].line.material.color.setHex(hex);}}
+    m.userData.target.set(wx,0,wz);if(!m.visible||p.snap){m.position.set(wx,0,wz);if(p.snap&&tacTrails[id])tacTrails[id].pts.length=0;}
+    m.visible=true;const lbl=m.getObjectByName('label');if(lbl)lbl.visible=showID;if(showTr)addTrail(id,wx,wz);
+  });
+  Object.keys(tacPool).forEach(id=>{if(!active.has(id))tacPool[id].visible=false;});
+  Object.values(tacTrails).forEach(t=>t.line.visible=showTr);
+  if(f.ball&&f.ball.pitch_pos){const bx=f.ball.pitch_pos[0]-PW/2,bz=f.ball.pitch_pos[1]-PH/2;tacBall.userData.target.set(bx,.6,bz);if(!tacBall.visible)tacBall.position.set(bx,.6,bz);tacBall.visible=true;}else tacBall.visible=false;
+  syncVideo(f.timestamp);
+  document.getElementById('h-frame').textContent=idx+1;document.getElementById('h-time').textContent=f.timestamp.toFixed(2);
+  document.getElementById('h-players').textContent=mapped+'/'+total;document.getElementById('h-homo').textContent='YES';
+  document.getElementById('time-lbl').textContent=f.timestamp.toFixed(1)+'s / '+tacFrameData.metadata.duration.toFixed(1)+'s';
+  document.getElementById('tl-fill').style.width=(idx/Math.max(tacFrameData.frames.length-1,1)*100)+'%';
+}
+
+function tacTogglePlay(){tacPlaying=!tacPlaying;document.getElementById('play-btn').textContent=tacPlaying?'⏸':'▶';}
+function tacSetSpd(s,btn){tacSpeed=s;document.querySelectorAll('.spd').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+function tacSeek(e){if(!tacFrameData)return;const r=document.getElementById('timeline').getBoundingClientRect();tacCurFrame=Math.floor((e.clientX-r.left)/r.width*tacFrameData.frames.length);tacRenderFrame(tacCurFrame);}
+function tacScreenshot(){tacRen.render(tacScene,tacCam);const a=document.createElement('a');a.download='tactics_'+Date.now()+'.png';a.href=tacCanvas.toDataURL('image/png');a.click();}
+
+const TAC_PRESETS={broadcast:{pos:[0,32,58]},top:{pos:[0,90,.1]},sideline:{pos:[0,14,74]},corner:{pos:[-66,26,56]}};
+function tacSetPreset(name){const p=TAC_PRESETS[name];if(!p)return;const s0=tacCam.position.clone(),t0=tacCtrl.target.clone();const ep=new THREE.Vector3(...p.pos),et=new THREE.Vector3(0,0,0);let t=null;(function go(ts){if(!t)t=ts;const e=1-Math.pow(1-Math.min((ts-t)/700,1),3);tacCam.position.lerpVectors(s0,ep,e);tacCtrl.target.lerpVectors(t0,et,e);if(e<1)requestAnimationFrame(go);})(performance.now());}
+function tacResize(){const p=document.getElementById('three-panel');tacRen.setSize(p.clientWidth,p.clientHeight,false);tacCam.aspect=p.clientWidth/p.clientHeight;tacCam.updateProjectionMatrix();}
+window.addEventListener('resize',()=>{if(activeTab==='tactical')tacResize();else meshResize();});
+tacResize();
+
+(function tacLoop(ts){
+  requestAnimationFrame(tacLoop);tacCtrl.update();
+  Object.values(tacPool).forEach(m=>{if(m.visible&&m.userData.target)m.position.lerp(m.userData.target,.35);});
+  if(tacBall.visible)tacBall.position.lerp(tacBall.userData.target,.45);
+  if(tacFrameData&&tacPlaying){const fd=1000/tacFps/tacSpeed;if(ts-tacLastTick>=fd){tacCurFrame=(tacCurFrame+1)%tacFrameData.frames.length;tacRenderFrame(tacCurFrame);tacLastTick=ts;}}
+  tacRen.render(tacScene,tacCam);
+})(0);
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLICK-TO-REASSIGN
+// Click a mannequin on the 3D canvas to get a context menu.
+// Reassignment patches teamMap + every frame in tacFrameData in memory.
+// ═══════════════════════════════════════════════════════════════════════════
+const _tacRaycaster = new THREE.Raycaster();
+const _tacMouse     = new THREE.Vector2();
+let   _menuPlayerId = null;  // track id currently targeted by the menu
+
+tacCanvas.addEventListener('click', e => {
+  // If the menu is already open, clicking anywhere closes it
+  if (document.getElementById('player-menu').style.display === 'flex') {
+    closePlayerMenu(); return;
+  }
+  if (window.BT && window.BT.activeTool && window.BT.activeTool('tac') !== 'select') return;
+  if (!tacFrameData) return;
+
+  // Convert mouse position to NDC
+  const rect = tacCanvas.getBoundingClientRect();
+  _tacMouse.x =  ((e.clientX - rect.left)  / rect.width)  * 2 - 1;
+  _tacMouse.y = -((e.clientY - rect.top)   / rect.height) * 2 + 1;
+
+  _tacRaycaster.setFromCamera(_tacMouse, tacCam);
+
+  // Collect all visible mannequin meshes from the current pool
+  const meshes = [];
+  const idMap  = new Map();   // mesh uuid -> player id string
+  Object.entries(tacPool).forEach(([id, group]) => {
+    if (!group.visible) return;
+    group.traverse(child => {
+      if (child.isMesh) {
+        meshes.push(child);
+        idMap.set(child.uuid, id);
+      }
+    });
+  });
+
+  const hits = _tacRaycaster.intersectObjects(meshes, false);
+  if (!hits.length) return;
+
+  const hitId = idMap.get(hits[0].object.uuid);
+  if (hitId === undefined) return;
+
+  _openPlayerMenu(hitId, e.clientX, e.clientY);
+});
+
+// Close on Escape
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape') closePlayerMenu();
+});
+
+function _openPlayerMenu(playerId, cx, cy) {
+  _menuPlayerId = playerId;
+  const menu = document.getElementById('player-menu');
+  const colA = document.getElementById('colA').value;
+  const colB = document.getElementById('colB').value;
+
+  document.getElementById('pm-title').textContent = 'PLAYER #' + playerId;
+  document.getElementById('pm-dot-a').style.background = colA;
+  document.getElementById('pm-dot-b').style.background = colB;
+
+  // Position menu near the click, keeping it on screen
+  const mw = 160, mh = 170;
+  const x  = Math.min(cx + 8, window.innerWidth  - mw - 8);
+  const y  = Math.min(cy + 8, window.innerHeight - mh - 8);
+  menu.style.left    = x + 'px';
+  menu.style.top     = y + 'px';
+  menu.style.display = 'flex';
+}
+
+function closePlayerMenu() {
+  document.getElementById('player-menu').style.display = 'none';
+  _menuPlayerId = null;
+}
+
+function reassignPlayer(assignment) {
+  const id = _menuPlayerId;
+  closePlayerMenu();
+  if (id === null || !tacFrameData) return;
+
+  const colAhex = parseInt(document.getElementById('colA').value.slice(1), 16);
+  const colBhex = parseInt(document.getElementById('colB').value.slice(1), 16);
+  const gkHex   = 0x00E5A0;
+  const refHex  = parseInt(document.getElementById('colR').value.slice(1), 16);
+
+  // 1. Update teamMap (used by getTacPlayer / mannequin colors)
+  if (assignment === 0)           teamMap[id] = 'A';
+  else if (assignment === 1)      teamMap[id] = 'B';
+  else if (assignment === 'goalkeeper') teamMap[id] = 'GK';
+  else if (assignment === 'referee')    teamMap[id] = 'REF';
+
+  // 2. Recolor the existing mannequin immediately
+  const mannequin = tacPool[id];
+  if (mannequin) {
+    let newHex;
+    if (assignment === 0)                newHex = colAhex;
+    else if (assignment === 1)           newHex = colBhex;
+    else if (assignment === 'goalkeeper') newHex = gkHex;
+    else                                  newHex = refHex;
+    recolorMannequin(mannequin, newHex);
+    mannequin.userData.teamCur = String(assignment);
+    // also recolor the trail
+    if (tacTrails[id]) tacTrails[id].line.material.color.setHex(newHex);
+  }
+
+  // 3. Patch every frame in tacFrameData so the reassignment sticks across
+  //    all frames, not just the current one
+  const numId = Number(id);
+  tacFrameData.frames.forEach(f => {
+    f.players.forEach(p => {
+      if (p.id !== numId) return;
+      if (assignment === 0 || assignment === 1) {
+        p.team = assignment;
+        p.kind = 'player';
+      } else if (assignment === 'goalkeeper') {
+        p.kind = 'goalkeeper';
+        p.team = null;
+      } else if (assignment === 'referee') {
+        p.kind = 'referee';
+        p.team = null;
+      }
+    });
+  });
+
+  // 4. Re-render current frame to reflect the change immediately
+  tacRenderFrame(tacCurFrame);
+  _showToast(`Track #${id} reassigned to ${assignment === 0 ? 'Team A' : assignment === 1 ? 'Team B' : assignment}.`, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MESH ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+let meshInitialized=false,meshRenderer,meshScene,meshCamera,meshCtrl;
+function initMeshScene(){
+  if(meshInitialized)return;meshInitialized=true;
+  const mc=document.getElementById('c-mesh');
+  meshRenderer=new THREE.WebGLRenderer({canvas:mc,antialias:true,preserveDrawingBuffer:true});
+  meshRenderer.setPixelRatio(Math.min(devicePixelRatio,2));meshRenderer.shadowMap.enabled=true;meshRenderer.shadowMap.type=THREE.PCFSoftShadowMap;meshRenderer.setClearColor(0x0f172a);
+  meshScene=new THREE.Scene();window.meshScene=meshScene;meshScene.fog=new THREE.Fog(0x0f172a,100,180);
+  meshCamera=new THREE.PerspectiveCamera(50,1,0.1,400);window.meshCamera=meshCamera;meshCamera.position.set(0,35,50);
+  meshCtrl=new THREE.OrbitControls(meshCamera,mc);window.meshCtrl=meshCtrl;meshCtrl.enableDamping=true;meshCtrl.dampingFactor=0.07;meshCtrl.maxPolarAngle=Math.PI/2.02;
+  meshScene.add(new THREE.AmbientLight(0xffffff,0.7));
+  const msun=new THREE.DirectionalLight(0xfff8e0,1.0);msun.position.set(10,30,10);msun.castShadow=true;msun.shadow.mapSize.set(2048,2048);msun.shadow.camera.left=msun.shadow.camera.bottom=-70;msun.shadow.camera.right=msun.shadow.camera.top=70;
+  meshScene.add(msun);meshScene.add(new THREE.HemisphereLight(0xbfd8ff,0x3a5a2e,0.15));
+  _buildMeshPitch();meshResize();
+  (function mLoop(){requestAnimationFrame(mLoop);meshCtrl.update();if(meshFrames.length>0&&meshPlaying){const fd=1000/(meshMetadata?.playback_fps||30)/meshSpeed;const now=performance.now();if(now-meshLastTick>=fd){meshCurFrame=(meshCurFrame+1)%meshFrames.length;_meshUpdateFrame(meshCurFrame);meshLastTick=now;}}meshRenderer.render(meshScene,meshCamera);})();
+}
+let meshPitchGroup=null,meshPW=105,meshPH=68;
+function _buildMeshPitch(){
+  if(meshPitchGroup)meshScene.remove(meshPitchGroup);meshPitchGroup=new THREE.Group();
+  const mpw=meshPW,mph=meshPH;function mwp(x,y){return[x-mpw/2,y-mph/2];}
+  for(let i=0;i<10;i++){const m=new THREE.Mesh(new THREE.PlaneGeometry(mpw/10,mph),new THREE.MeshLambertMaterial({color:i%2?0x267026:0x2d7a2d}));m.rotation.x=-Math.PI/2;m.receiveShadow=true;m.position.set(-mpw/2+mpw/20+i*mpw/10,0,0);meshPitchGroup.add(m);}
+  const lm2=new THREE.LineBasicMaterial({color:0xffffff});
+  const ln2=pts=>meshPitchGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x,z])=>new THREE.Vector3(x,.02,z))),lm2));
+  const rc2=(cx,cz,w,h)=>{const hw=w/2,hh=h/2;ln2([[cx-hw,cz-hh],[cx+hw,cz-hh],[cx+hw,cz+hh],[cx-hw,cz+hh],[cx-hw,cz-hh]]);};
+  const ci2=(cx,cz,r)=>{const p=[];for(let i=0;i<=64;i++){const a=i/64*Math.PI*2;p.push([cx+Math.cos(a)*r,cz+Math.sin(a)*r]);}ln2(p);};
+  const dt2=(x,z)=>{const m=new THREE.Mesh(new THREE.CircleGeometry(.3,16),new THREE.MeshBasicMaterial({color:0xffffff}));m.rotation.x=-Math.PI/2;m.position.set(x,.03,z);meshPitchGroup.add(m);};
+  ln2([mwp(0,0),mwp(mpw,0),mwp(mpw,mph),mwp(0,mph),mwp(0,0)]);ln2([mwp(mpw/2,0),mwp(mpw/2,mph)]);
+  ci2(...mwp(mpw/2,mph/2),9.15);dt2(...mwp(mpw/2,mph/2));
+  rc2(...mwp(16.5/2,mph/2),16.5,40.32);rc2(...mwp(5.5/2,mph/2),5.5,18.32);dt2(...mwp(11,mph/2));
+  rc2(...mwp(mpw-16.5/2,mph/2),16.5,40.32);rc2(...mwp(mpw-5.5/2,mph/2),5.5,18.32);dt2(...mwp(mpw-11,mph/2));
+  meshScene.add(meshPitchGroup);
+}
+function f16toF32(h){const s=(h&0x8000)>>15,e=(h&0x7C00)>>10,f=h&0x03FF;if(e===0)return(s?-1:1)*Math.pow(2,-14)*(f/1024);if(e===0x1F)return f?NaN:(s?-Infinity:Infinity);return(s?-1:1)*Math.pow(2,e-15)*(1+f/1024);}
+function b64ToBytes(b64){const bin=atob(b64),out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out;}
+function decodeVerts(b64,dtype){const bytes=b64ToBytes(b64);if(dtype==='fp16'){const u16=new Uint16Array(bytes.buffer,bytes.byteOffset,bytes.byteLength/2),f32=new Float32Array(u16.length);for(let i=0;i<u16.length;i++)f32[i]=f16toF32(u16[i]);return f32;}if(dtype==='fp32'){if(bytes.byteOffset%4===0)return new Float32Array(bytes.buffer,bytes.byteOffset,bytes.byteLength/4);const cp=new Uint8Array(bytes.byteLength);cp.set(bytes);return new Float32Array(cp.buffer);}throw new Error('unknown dtype '+dtype);}
+function decodeFaces(b64){const bytes=b64ToBytes(b64);if(bytes.byteOffset%4===0)return new Uint32Array(bytes.buffer,bytes.byteOffset,bytes.byteLength/4);const cp=new Uint8Array(bytes.byteLength);cp.set(bytes);return new Uint32Array(cp.buffer);}
+
+let meshFrames=[],meshMetadata=null,meshFacesIdx=null,meshVertsDtype='fp16',meshIsImage=false;
+let meshTotalFrames=0,meshCurFrame=0,meshPlaying=false,meshSpeed=1,meshLastTick=0;
+const meshTrackRecs={},meshTrackYaws={};
+let meshGlobalTiltDeg=0,meshYawOffsetRad=0;
+let meshTeamHexes={A:'#CC2222',B:'#1144CC'};
+const YAW_VEL_WIN=5,YAW_VEL_THR=0.04,YAW_CALIB_TOP_K=7;
+// Per-track team overrides for mesh page: tid → 0|1|-1
+const meshTrackOverrides={};
+
+function _meshTeamColor(ti){if(ti===0)return new THREE.Color(meshTeamHexes.A);if(ti===1)return new THREE.Color(meshTeamHexes.B);if(ti===2)return new THREE.Color(document.getElementById('colR').value);if(ti===3)return new THREE.Color(0x00E5A0);return new THREE.Color(0x888888);}
+function _meshTeamColorForTrack(tid){const ov=meshTrackOverrides[tid];if(ov!==undefined)return _meshTeamColor(ov);const rec=meshTrackRecs[tid];if(rec){if(rec.kind==='referee')return new THREE.Color(document.getElementById('colR').value);if(rec.kind==='goalkeeper')return new THREE.Color(0x00E5A0);}return _meshTeamColor(rec?rec.team:-1);}
+function _meshMakeLabel(text){const cv=document.createElement('canvas');cv.width=256;cv.height=64;const cx=cv.getContext('2d');cx.fillStyle='rgba(17,24,39,.92)';cx.fillRect(64,8,128,48);cx.fillStyle='#fff';cx.font='bold 28px sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(text,128,32);const tex=new THREE.CanvasTexture(cv);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false}));sp.scale.set(2,.5,1);return sp;}
+function _meshClearAll(){for(const tid of Object.keys(meshTrackRecs)){meshScene.remove(meshTrackRecs[tid].mesh);if(meshTrackRecs[tid].label)meshScene.remove(meshTrackRecs[tid].label);meshTrackRecs[tid].mesh.geometry.dispose();meshTrackRecs[tid].mesh.material.dispose();}for(const k of Object.keys(meshTrackRecs))delete meshTrackRecs[k];for(const k of Object.keys(meshTrackYaws))delete meshTrackYaws[k];}
+function _computeMeshYaws(){
+  for(const k of Object.keys(meshTrackYaws))delete meshTrackYaws[k];const series={};
+  for(const f of meshFrames){for(const p of(f.players||[])){if(!p.smplx||p.id===undefined||p.id<0||!p.pitch_pos||p.pitch_pos.length!==2)continue;const gy=(typeof p.smplx.gvhmr_yaw==='number')?p.smplx.gvhmr_yaw:null;if(!series[p.id])series[p.id]=[];series[p.id].push([f.frame_idx,p.pitch_pos[0],p.pitch_pos[1],gy]);}}
+  for(const tidStr of Object.keys(series)){const arr=series[tidStr];arr.sort((a,b)=>a[0]-b[0]);const N=arr.length;const velYaws=new Array(N).fill(0),speeds=new Array(N).fill(0);for(let i=0;i<N;i++){let dx=0,dz=0,n=0;const lo=Math.max(0,i-YAW_VEL_WIN),hi=Math.min(N-2,i+YAW_VEL_WIN);for(let k=lo;k<=hi;k++){dx+=arr[k+1][1]-arr[k][1];dz+=arr[k+1][2]-arr[k][2];n++;}if(n>0){dx/=n;dz/=n;}velYaws[i]=Math.atan2(dx,dz);speeds[i]=Math.sqrt(dx*dx+dz*dz);}
+  const hasGY=arr.some(r=>r[3]!==null);const yawMap={};
+  if(!hasGY){let last=null;for(let i=0;i<N;i++){let y=speeds[i]>YAW_VEL_THR?velYaws[i]:(last!==null?last:0);yawMap[arr[i][0]]=y;last=y;}meshTrackYaws[tidStr]=yawMap;continue;}
+  const cands=[];for(let i=0;i<N;i++){if(arr[i][3]===null||speeds[i]<YAW_VEL_THR)continue;cands.push([speeds[i],i]);}cands.sort((a,b)=>b[0]-a[0]);
+  let C=0;if(cands.length>0){const K=Math.min(YAW_CALIB_TOP_K,cands.length);let cs=0,ss=0;for(let k=0;k<K;k++){const i=cands[k][1],delta=velYaws[i]-arr[i][3];cs+=Math.cos(delta);ss+=Math.sin(delta);}C=Math.atan2(ss,cs);}
+  let last=0;for(let i=0;i<N;i++){let y;if(arr[i][3]!==null){y=arr[i][3]+C;while(y>Math.PI)y-=2*Math.PI;while(y<-Math.PI)y+=2*Math.PI;}else{y=last;}yawMap[arr[i][0]]=y;last=y;}meshTrackYaws[tidStr]=yawMap;}
+}
+
+function loadMeshData(data){
+  if(!meshInitialized)initMeshScene();
+  meshMetadata=data.metadata||{};window.meshMetadata=meshMetadata;const sm=meshMetadata.smplx||{};meshIsImage=!!sm.is_image;
+  if(!sm.faces_b64){_showToast('No precomputed verts — re-run lift_gvhmr.py with --verts fp16',8000);return;}
+  meshVertsDtype=sm.verts_dtype||'fp16';meshFacesIdx=decodeFaces(sm.faces_b64);
+  meshPW=meshMetadata.pitch_width||105;meshPH=meshMetadata.pitch_height||68;window.meshPW=meshPW;window.meshPH=meshPH;_buildMeshPitch();
+  meshFrames=data.frames||[];meshTotalFrames=meshFrames.length;window.meshTotalFrames=meshTotalFrames;
+  const kc=meshMetadata.teams&&meshMetadata.teams.kit_colors;if(kc){if(kc[0]){meshTeamHexes.A=kc[0];document.getElementById('colA').value=kc[0];document.getElementById('swA').style.background=kc[0];}if(kc[1]){meshTeamHexes.B=kc[1];document.getElementById('colB').value=kc[1];document.getElementById('swB').style.background=kc[1];}}
+  const rc=meshMetadata.teams&&meshMetadata.teams.referee_color;if(rc){document.getElementById('colR').value=rc;document.getElementById('swR').style.background=rc;}
+  // Clear per-track overrides from previous load
+  for(const k of Object.keys(meshTrackOverrides))delete meshTrackOverrides[k];
+  const trackTeams={},trackKinds={};for(const f of meshFrames)for(const p of(f.players||[])){if(p.smplx&&p.smplx.verts_b64!=null&&p.id!==undefined&&p.id>=0){if(p.team!==undefined&&p.team!==null)trackTeams[p.id]=p.team;else if(!(p.id in trackTeams))trackTeams[p.id]=-1;if(p.kind)trackKinds[p.id]=p.kind;}}
+  _meshClearAll();const NV=sm.num_verts||10475;
+  for(const tidStr of Object.keys(trackTeams)){const tid=+tidStr,team=trackTeams[tidStr],kind=trackKinds[tidStr]||'player';const geom=new THREE.BufferGeometry();geom.setAttribute('position',new THREE.BufferAttribute(new Float32Array(NV*3),3));geom.setIndex(new THREE.BufferAttribute(meshFacesIdx,1));const mat=new THREE.MeshLambertMaterial({color:_meshTeamColor(team),side:THREE.DoubleSide,wireframe:document.getElementById('sw-wire').checked});const mesh=new THREE.Mesh(geom,mat);mesh.castShadow=true;mesh.receiveShadow=true;mesh.visible=false;meshScene.add(mesh);const label=_meshMakeLabel('#'+tid);label.visible=false;meshScene.add(label);meshTrackRecs[tid]={mesh,team,kind,label};}
+  _computeMeshYaws();
+  // Apply kit colors explicitly — setting .value programmatically won't fire onchange
+  meshTeamHexes.A=document.getElementById('colA').value;
+  meshTeamHexes.B=document.getElementById('colB').value;
+  for(const tid of Object.keys(meshTrackRecs)){meshTrackRecs[tid].mesh.material.color=_meshTeamColorForTrack(+tid);meshTrackRecs[tid].mesh.material.needsUpdate=true;}
+  document.getElementById('mh-tracks').textContent=Object.keys(meshTrackRecs).length;meshCurFrame=0;_meshUpdateFrame(0);
+}
+
+function _meshUpdateFrame(idx){
+  if(meshTotalFrames===0)return;meshCurFrame=Math.max(0,Math.min(idx,meshTotalFrames-1));window.meshCurFrame=meshCurFrame;const f=meshFrames[meshCurFrame];if(!f)return;
+  for(const tid of Object.keys(meshTrackRecs)){meshTrackRecs[tid].mesh.visible=false;if(meshTrackRecs[tid].label)meshTrackRecs[tid].label.visible=false;}
+  let visCount=0;const tiltRad=meshGlobalTiltDeg*Math.PI/180;
+  for(const p of(f.players||[])){if(!p.smplx||!p.smplx.verts_b64)continue;const tr=meshTrackRecs[p.id];if(!tr)continue;const verts=decodeVerts(p.smplx.verts_b64,meshVertsDtype);const posAttr=tr.mesh.geometry.getAttribute('position');posAttr.array.set(verts);posAttr.needsUpdate=true;tr.mesh.geometry.computeVertexNormals();tr.mesh.geometry.computeBoundingSphere();let x=0,z=0;if(p.pitch_pos&&p.pitch_pos.length===2){x=p.pitch_pos[0]-meshPW/2;z=p.pitch_pos[1]-meshPH/2;}tr.mesh.position.set(x,0,z);const yawMap=meshTrackYaws[p.id];const baseYaw=(yawMap&&yawMap[f.frame_idx]!==undefined)?yawMap[f.frame_idx]:0;tr.mesh.rotation.set(tiltRad,baseYaw+meshYawOffsetRad,0);tr.mesh.visible=true;if(tr.label){tr.label.position.set(x,2.4,z);tr.label.visible=document.getElementById('sw-mesh-ids').checked;}visCount++;}
+  document.getElementById('mh-frame').textContent=meshCurFrame+1;document.getElementById('mh-total').textContent=meshTotalFrames;document.getElementById('mh-players').textContent=visCount;
+  document.getElementById('tl-fill').style.width=(100*meshCurFrame/Math.max(1,meshTotalFrames-1))+'%';document.getElementById('time-lbl').textContent=(meshCurFrame+1)+' / '+meshTotalFrames;
+}
+
+function meshTogglePlay(){if(meshTotalFrames===0)return;meshPlaying=!meshPlaying;if(meshPlaying&&meshCurFrame>=meshTotalFrames-1)meshCurFrame=0;document.getElementById('play-btn').textContent=meshPlaying?'⏸':'▶';}
+function meshSetSpd(s,btn){meshSpeed=s;document.querySelectorAll('.spd').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+function meshSeek(e){if(meshTotalFrames===0)return;const tl=document.getElementById('timeline'),rect=tl.getBoundingClientRect();_meshUpdateFrame(Math.round(Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width))*(meshTotalFrames-1)));}
+function meshToggleWireframe(on){for(const tid of Object.keys(meshTrackRecs)){meshTrackRecs[tid].mesh.material.wireframe=on;meshTrackRecs[tid].mesh.material.needsUpdate=true;}}
+function meshToggleIds(on){for(const tid of Object.keys(meshTrackRecs)){if(meshTrackRecs[tid].label)meshTrackRecs[tid].label.visible=on&&meshTrackRecs[tid].mesh.visible;}}
+function meshSetTilt(deg){meshGlobalTiltDeg=Number(deg);document.getElementById('tilt-lbl').textContent=meshGlobalTiltDeg+'°';_meshUpdateFrame(meshCurFrame);}
+function meshSetYawOffset(deg){meshYawOffsetRad=Number(deg)*Math.PI/180;document.getElementById('yaw-off-lbl').textContent=Number(deg)+'°';_meshUpdateFrame(meshCurFrame);}
+function meshSetPreset(name){if(!meshCamera)return;const p={broadcast:[0,35,50],top:[0,95,0],sideline:[0,18,55],corner:[55,28,40]}[name]||[0,35,50];meshCamera.position.set(p[0],p[1],p[2]);meshCtrl.target.set(0,0,0);}
+function meshScreenshot(){if(!meshRenderer)return;meshRenderer.render(meshScene,meshCamera);const a=document.createElement('a');a.download='mesh_'+Date.now()+'.png';a.href=document.getElementById('c-mesh').toDataURL('image/png');a.click();}
+function meshResize(){if(!meshRenderer)return;const panel=document.getElementById('view-mesh');const w=panel.clientWidth,h=panel.clientHeight;meshRenderer.setSize(w,h,false);meshCamera.aspect=w/h;meshCamera.updateProjectionMatrix();}
+
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){e.preventDefault();if(activeTab==='mesh')meshTogglePlay();else tacTogglePlay();}
+  else if(e.code==='ArrowRight'){if(activeTab==='mesh')_meshUpdateFrame(meshCurFrame+1);else{if(tacFrameData){tacCurFrame=(tacCurFrame+1)%tacFrameData.frames.length;tacRenderFrame(tacCurFrame);}}}
+  else if(e.code==='ArrowLeft'){if(activeTab==='mesh')_meshUpdateFrame(meshCurFrame-1);else{if(tacFrameData){tacCurFrame=Math.max(0,tacCurFrame-1);tacRenderFrame(tacCurFrame);}}}
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MESH TAB — CLICK-TO-REASSIGN TEAM
+// Click a mesh in select mode → small popup → Team A / B / Unassigned
+// ═══════════════════════════════════════════════════════════════════════════
+(function(){
+  'use strict';
+  const _cr = new THREE.Raycaster();
+  let _popupTid = null;
+
+  // Build popup element once
+  const popup = document.createElement('div');
+  popup.id = 'mesh-team-popup';
+  popup.style.cssText = 'position:fixed;display:none;flex-direction:column;gap:6px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 12px;z-index:400;box-shadow:0 6px 20px rgba(0,0,0,.6);min-width:155px;font-family:Sora,system-ui,sans-serif;';
+  popup.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+      <span id="mtp-label" style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:#475569;letter-spacing:.1em;">PLAYER #—</span>
+      <button onclick="closeMeshTeamPopup()" style="background:none;border:none;color:#475569;font-size:13px;cursor:pointer;padding:0;line-height:1;">✕</button>
+    </div>
+    <button id="mtp-A" onclick="meshReassignTrack(0)" style="padding:6px 10px;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;">⬤ Team A</button>
+    <button id="mtp-B" onclick="meshReassignTrack(1)" style="padding:6px 10px;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;">⬤ Team B</button>
+    <button id="mtp-R" onclick="meshReassignTrack(2)" style="padding:6px 10px;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;background:#1e293b;color:#FFD400;">⬤ Referee</button>
+    <button id="mtp-GK" onclick="meshReassignTrack(3)" style="padding:6px 10px;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;text-align:left;background:#1e293b;color:#00E5A0;">⬤ Goalkeeper</button>
+    <button id="mtp-U" onclick="meshReassignTrack(-1)" style="padding:6px 10px;border:none;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;text-align:left;background:#263344;color:#94a3b8;">⬤ Unassigned</button>`;
+  document.body.appendChild(popup);
+
+  window.closeMeshTeamPopup = function() {
+    popup.style.display = 'none';
+    _popupTid = null;
+  };
+
+  window.meshReassignTrack = function(newTeam) {
+    if (_popupTid === null) return;
+    const tid = _popupTid;
+    meshTrackOverrides[tid] = newTeam;
+    if (meshTrackRecs[tid]) {
+      meshTrackRecs[tid].mesh.material.color = _meshTeamColorForTrack(tid);
+      meshTrackRecs[tid].mesh.material.needsUpdate = true;
+    }
+    window.closeMeshTeamPopup();
+    if (typeof _showToast === 'function') {
+      const label = newTeam === 0 ? 'Team A' : newTeam === 1 ? 'Team B' : newTeam === 2 ? 'Referee' : newTeam === 3 ? 'Goalkeeper' : 'Unassigned';
+      _showToast('Mesh track #' + tid + ' → ' + label, 3000);
+    }
+  };
+
+  function openPopup(tid, cx, cy) {
+    _popupTid = tid;
+    document.getElementById('mtp-label').textContent = 'PLAYER #' + tid;
+    document.getElementById('mtp-A').style.background = meshTeamHexes.A;
+    document.getElementById('mtp-A').style.color = '#fff';
+    document.getElementById('mtp-B').style.background = meshTeamHexes.B;
+    document.getElementById('mtp-B').style.color = '#fff';
+    document.getElementById('mtp-R').style.color = document.getElementById('colR').value;
+    const cur = (meshTrackOverrides[tid] !== undefined) ? meshTrackOverrides[tid] : (meshTrackRecs[tid] ? meshTrackRecs[tid].team : -1);
+    document.getElementById('mtp-A').style.outline  = cur === 0  ? '2px solid #fff'     : 'none';
+    document.getElementById('mtp-B').style.outline  = cur === 1  ? '2px solid #fff'     : 'none';
+    document.getElementById('mtp-R').style.outline  = cur === 2  ? '2px solid #FFD400'  : 'none';
+    document.getElementById('mtp-GK').style.outline = cur === 3  ? '2px solid #00E5A0'  : 'none';
+    document.getElementById('mtp-U').style.outline  = cur === -1 ? '2px solid #94a3b8'  : 'none';
+    popup.style.display = 'flex';
+    const pw = popup.offsetWidth || 160, ph = popup.offsetHeight || 130;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let px = cx + 12, py = cy - 16;
+    if (px + pw > vw - 8) px = cx - pw - 8;
+    if (py + ph > vh - 8) py = vh - ph - 8;
+    if (py < 8) py = 8;
+    popup.style.left = px + 'px';
+    popup.style.top  = py + 'px';
+  }
+
+  // Close popup when clicking outside
+  document.addEventListener('pointerdown', (e) => {
+    if (popup.style.display !== 'none' && !popup.contains(e.target)) {
+      window.closeMeshTeamPopup();
+    }
+  });
+
+  // Wire click on mesh canvas after it exists
+  function wireMeshClick() {
+    const canvas = document.getElementById('c-mesh');
+    if (!canvas) { setTimeout(wireMeshClick, 300); return; }
+    if (canvas.dataset.teamClickWired === '1') return;
+    canvas.dataset.teamClickWired = '1';
+
+    canvas.addEventListener('click', (e) => {
+      // Only in select mode (BT manages tool state)
+      if (window.BT && window.BT.activeTool && window.BT.activeTool('mesh') !== 'select') return;
+      // Use the module-scoped variable if available via closure check
+      if (!window.meshTotalFrames) return;
+      // Close popup if open
+      if (popup.style.display !== 'none') { window.closeMeshTeamPopup(); return; }
+
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width)  * 2 - 1,
+        -((e.clientY - rect.top)  / rect.height) * 2 + 1
+      );
+      if (!window.meshCamera) return;
+      _cr.setFromCamera(mouse, window.meshCamera);
+
+      // Collect visible track meshes
+      const candidates = [];
+      const tidMap = new Map();
+      for (const [tidStr, rec] of Object.entries(meshTrackRecs)) {
+        if (!rec.mesh.visible) continue;
+        candidates.push(rec.mesh);
+        tidMap.set(rec.mesh.uuid, +tidStr);
+      }
+      const hits = _cr.intersectObjects(candidates, false);
+      if (!hits.length) return;
+      const tid = tidMap.get(hits[0].object.uuid);
+      if (tid === undefined) return;
+      openPopup(tid, e.clientX, e.clientY);
+    });
+  }
+  wireMeshClick();
+})();
+
+// ╔══════════════════════════════════════════════════════════════════════════
+// ║  MESH-TAB TACTICAL DRAWINGS + MP4 RECORDING (added by patch script)
+// ║  Tag: MESH_FEATURES_V1
+// ║
+// ║  Lives entirely inside the MESH tab. Uses the existing meshScene,
+// ║  meshCamera, meshCtrl, _meshUpdateFrame, meshPW, meshPH globals so it
+// ║  matches the pitch and player meshes that are already on screen.
+// ║
+// ║  Drawings:
+// ║    - 4 primitive types (arrow, line, path, animated path), all on the
+// ║      pitch plane at y=0.05, raycasted from screen-space mouse clicks.
+// ║    - Persisted across frames. Animated paths animate from the frame
+// ║      they were created on, using setDrawRange on a tube geometry.
+// ║    - OrbitControls are disabled while a drawing tool is active.
+// ║
+// ║  Recording:
+// ║    - canvas.captureStream(fps) + MediaRecorder for WebM (VP9 preferred,
+// ║      VP8 fallback).
+// ║    - Drives _meshUpdateFrame() at the source fps via setTimeout so
+// ║      output duration matches video duration.
+// ║    - POSTs the WebM to /transcode-to-mp4 for ffmpeg → MP4 conversion.
+// ║    - If transcode fails the WebM is still returned to the user as
+// ║      a fallback so the recording is never lost.
+// ╚══════════════════════════════════════════════════════════════════════════
+
+(function() {
+  'use strict';
+
+  // ── State ────────────────────────────────────────────────────────────────
+  const drawings = [];
+  const drawingObjects = {};
+  let currentTool = 'select';
+  let drawingInProgress = null;
+  const raycaster = new THREE.Raycaster();
+  const pitchPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+  // ── Geometry builders ────────────────────────────────────────────────────
+  function buildTube(points, thickness) {
+    if (points.length < 2) return null;
+    const v3 = points.map(p => new THREE.Vector3(p[0], 0.05, p[1]));
+    const curve = (points.length === 2)
+      ? new THREE.LineCurve3(v3[0], v3[1])
+      : new THREE.CatmullRomCurve3(v3, false, 'catmullrom', 0.1);
+    const segs = Math.max(8, Math.min(256, points.length * 8));
+    return new THREE.TubeGeometry(curve, segs, thickness, 8, false);
+  }
+
+  function buildArrowHead(start, end, thickness, color) {
+    const dir = new THREE.Vector3(end[0] - start[0], 0, end[1] - start[1]);
+    const len = dir.length();
+    if (len < 1e-4) return null;
+    dir.normalize();
+    const headLen = Math.max(thickness * 4, 0.8);
+    const headRad = Math.max(thickness * 2.5, 0.5);
+    const geom = new THREE.ConeGeometry(headRad, headLen, 16);
+    const mat = new THREE.MeshLambertMaterial({ color });
+    const mesh = new THREE.Mesh(geom, mat);
+    const up = new THREE.Vector3(0, 1, 0);
+    mesh.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(up, dir));
+    mesh.position.set(
+      end[0] + dir.x * (headLen / 2 - thickness),
+      0.05,
+      end[1] + dir.z * (headLen / 2 - thickness),
+    );
+    return mesh;
+  }
+
+  // ── Drawing lifecycle ────────────────────────────────────────────────────
+  function instantiate(d) {
+    if (!window.meshScene) return;
+    const color = new THREE.Color(d.color);
+    const mat = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
+    const meshes = [];
+    let totalIndices = 0;
+
+    const tubeGeom = buildTube(d.points, d.thickness);
+    if (tubeGeom) {
+      const tube = new THREE.Mesh(tubeGeom, mat);
+      window.meshScene.add(tube);
+      meshes.push(tube);
+      totalIndices = tubeGeom.index ? tubeGeom.index.count : 0;
+    }
+
+    if (d.type === 'arrow' && d.points.length >= 2) {
+      const head = buildArrowHead(
+        d.points[d.points.length - 2],
+        d.points[d.points.length - 1],
+        d.thickness, color
+      );
+      if (head) { window.meshScene.add(head); meshes.push(head); }
+    }
+
+    drawingObjects[d.id] = { meshes, totalIndices, material: mat };
+  }
+
+  function removeObjects(id) {
+    const rec = drawingObjects[id];
+    if (!rec) return;
+    for (const m of rec.meshes) {
+      if (window.meshScene) window.meshScene.remove(m);
+      if (m.geometry) m.geometry.dispose();
+    }
+    if (rec.material) rec.material.dispose();
+    delete drawingObjects[id];
+  }
+
+  function updateCountUI() {
+    const el = document.getElementById('mt-count');
+    if (el) el.textContent = drawings.length + ' drawing' + (drawings.length === 1 ? '' : 's');
+  }
+
+  // ── Mouse → pitch ────────────────────────────────────────────────────────
+  function mouseToPitch(e) {
+    const canvas = document.getElementById('c-mesh');
+    if (!canvas || !window.meshCamera) return null;
+    const rect = canvas.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    raycaster.setFromCamera(mouse, window.meshCamera);
+    const hit = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(pitchPlane, hit)) return null;
+    const PW = window.meshPW || 105, PH = window.meshPH || 68;
+    if (Math.abs(hit.x) > PW || Math.abs(hit.z) > PH) return null;
+    return [hit.x, hit.z];
+  }
+
+  // ── Public-ish API exposed on window for inline onclick handlers ─────────
+  window.meshSetTool = function(tool) {
+    currentTool = tool;
+    document.querySelectorAll('.mt-btn').forEach(b => {
+      const active = b.dataset.mt === tool;
+      b.classList.toggle('active', active);
+      // Inline-style buttons need their background updated too
+      b.style.background = active ? '#3b82f6' : '#1e293b';
+      b.style.color      = active ? '#fff'    : '#d1d5db';
+      b.style.borderColor = active ? '#3b82f6' : '#334155';
+    });
+    const durRow = document.getElementById('mt-dur-row');
+    if (durRow) durRow.style.display = (tool === 'animpath') ? 'flex' : 'none';
+    if (window.meshCtrl) window.meshCtrl.enabled = (tool === 'select');
+    const c = document.getElementById('c-mesh');
+    if (c) c.style.cursor = (tool === 'select') ? '' : 'crosshair';
+  };
+
+  window.meshUndoDrawing = function() {
+    if (drawings.length === 0) return;
+    const d = drawings.pop();
+    removeObjects(d.id);
+    updateCountUI();
+  };
+
+  window.meshClearDrawings = function() {
+    if (drawings.length === 0) return;
+    if (!confirm('Remove all ' + drawings.length + ' drawing(s)?')) return;
+    for (const id of Object.keys(drawingObjects)) removeObjects(id);
+    drawings.length = 0;
+    updateCountUI();
+  };
+
+  function addDrawing(type, points) {
+    if (points.length < 2) return;
+    const color = document.getElementById('mt-color').value;
+    const slider = parseInt(document.getElementById('mt-thick').value, 10);
+    const thickness = 0.05 + (slider - 1) / 9 * 0.45;
+    const d = {
+      id: 'd' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      type, points, color, thickness,
+    };
+    if (type === 'animpath') {
+      d.duration = parseFloat(document.getElementById('mt-dur').value) || 2.0;
+      d.startFrame = (typeof window.meshCurFrame === 'number') ? window.meshCurFrame : 0;
+    }
+    drawings.push(d);
+    instantiate(d);
+    updateAnimated(window.meshCurFrame || 0);
+    updateCountUI();
+  }
+
+  function updateAnimated(frame) {
+    const fps = (window.meshMetadata && window.meshMetadata.playback_fps) || 25;
+    for (const d of drawings) {
+      if (d.type !== 'animpath') continue;
+      const rec = drawingObjects[d.id];
+      if (!rec || rec.meshes.length === 0) continue;
+      const durFrames = Math.max(1, Math.round(d.duration * fps));
+      let progress;
+      if (frame < d.startFrame) progress = 0;
+      else if (frame >= d.startFrame + durFrames) progress = 1;
+      else progress = (frame - d.startFrame) / durFrames;
+      const tube = rec.meshes[0];
+      if (tube && tube.geometry && tube.geometry.index) {
+        tube.geometry.setDrawRange(0, Math.floor(rec.totalIndices * progress));
+      }
+      tube.visible = (frame >= d.startFrame);
+    }
+  }
+
+  // ── Mouse handlers on the mesh canvas ────────────────────────────────────
+  function wirePointerEvents() {
+    const canvas = document.getElementById('c-mesh');
+    if (!canvas) {
+      // The mesh canvas only exists after the mesh tab is initialised; wait.
+      setTimeout(wirePointerEvents, 300);
+      return;
+    }
+    if (canvas.dataset.tacticalWired === '1') return;
+    canvas.dataset.tacticalWired = '1';
+
+    let pointerDown = false;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (currentTool === 'select') return;
+      if (!window.meshTotalFrames) {
+        if (typeof window._showToast === 'function') window._showToast('Load a mesh JSON first', 4000);
+        return;
+      }
+      e.preventDefault();
+      const pt = mouseToPitch(e);
+      if (!pt) return;
+      pointerDown = true;
+      drawingInProgress = { type: currentTool, points: [pt], previewObj: null };
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!pointerDown || !drawingInProgress) return;
+      e.preventDefault();
+      const pt = mouseToPitch(e);
+      if (!pt) return;
+      const dip = drawingInProgress;
+      if (dip.type === 'path' || dip.type === 'animpath') {
+        const last = dip.points[dip.points.length - 1];
+        const dx = pt[0] - last[0], dz = pt[1] - last[1];
+        if (dx * dx + dz * dz < 0.04) return;
+        dip.points.push(pt);
+      } else {
+        dip.points = [dip.points[0], pt];
+      }
+      if (dip.previewObj) {
+        if (window.meshScene) window.meshScene.remove(dip.previewObj);
+        if (dip.previewObj.geometry) dip.previewObj.geometry.dispose();
+        if (dip.previewObj.material) dip.previewObj.material.dispose();
+        dip.previewObj = null;
+      }
+      if (dip.points.length >= 2) {
+        const colorHex = document.getElementById('mt-color').value;
+        const slider = parseInt(document.getElementById('mt-thick').value, 10);
+        const thickness = 0.05 + (slider - 1) / 9 * 0.45;
+        const geom = buildTube(dip.points, thickness);
+        if (geom) {
+          const mat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(colorHex), transparent: true, opacity: 0.7,
+          });
+          const mesh = new THREE.Mesh(geom, mat);
+          if (window.meshScene) window.meshScene.add(mesh);
+          dip.previewObj = mesh;
+        }
+      }
+    });
+
+    function endStroke(e) {
+      if (!pointerDown || !drawingInProgress) { pointerDown = false; return; }
+      pointerDown = false;
+      if (drawingInProgress.previewObj) {
+        if (window.meshScene) window.meshScene.remove(drawingInProgress.previewObj);
+        if (drawingInProgress.previewObj.geometry) drawingInProgress.previewObj.geometry.dispose();
+        if (drawingInProgress.previewObj.material) drawingInProgress.previewObj.material.dispose();
+      }
+      if (drawingInProgress.points.length >= 2) {
+        addDrawing(drawingInProgress.type, drawingInProgress.points);
+      }
+      drawingInProgress = null;
+    }
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointercancel', endStroke);
+    canvas.addEventListener('pointerleave', endStroke);
+  }
+  wirePointerEvents();
+
+  // ── Hook _meshUpdateFrame to refresh animated drawings every frame ───────
+  function installFrameHook() {
+    if (typeof window._meshUpdateFrame !== 'function') {
+      setTimeout(installFrameHook, 300);
+      return;
+    }
+    if (window._meshUpdateFrame.__tacticalWrapped) return;
+    const orig = window._meshUpdateFrame;
+    const wrapped = function(idx) {
+      const out = orig(idx);
+      try { updateAnimated(window.meshCurFrame || 0); } catch(_) {}
+      return out;
+    };
+    wrapped.__tacticalWrapped = true;
+    window._meshUpdateFrame = wrapped;
+  }
+  installFrameHook();
+
+  // ╔══════════════════════════════════════════════════════════════════════
+  // ║  MP4 RECORDING
+  // ╚══════════════════════════════════════════════════════════════════════
+
+  const recState = { active: false, recorder: null, chunks: [], cancelled: false };
+
+  function pickMimeType() {
+    const list = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
+    for (const m of list) {
+      if (typeof MediaRecorder !== 'undefined'
+          && MediaRecorder.isTypeSupported
+          && MediaRecorder.isTypeSupported(m)) return m;
+    }
+    return null;
+  }
+
+  function showOverlay(show) {
+    const el = document.getElementById('rec-overlay');
+    if (el) el.style.display = show ? 'flex' : 'none';
+  }
+  function setProgress(pct, stage, detail) {
+    const bar = document.getElementById('rec-bar');
+    if (bar) bar.style.width = pct + '%';
+    if (stage !== undefined) {
+      const s = document.getElementById('rec-stage');
+      if (s) s.textContent = stage;
+    }
+    if (detail !== undefined) {
+      const d = document.getElementById('rec-detail');
+      if (d) d.textContent = detail;
+    }
+  }
+  function setTitle(t) {
+    const el = document.getElementById('rec-title');
+    if (el) el.innerHTML = '<span id="rec-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:6px;vertical-align:middle;animation:recpulse 1.2s infinite;"></span>' + t;
+  }
+
+  window.recordMp4Mesh = async function() {
+    if (recState.active) return;
+    if (!window.meshTotalFrames) {
+      if (typeof window._showToast === 'function') window._showToast('Load a mesh JSON first', 4000);
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      if (typeof window._showToast === 'function') window._showToast('Your browser does not support MediaRecorder.', 5000);
+      return;
+    }
+    const mime = pickMimeType();
+    if (!mime) {
+      if (typeof window._showToast === 'function') window._showToast('No supported WebM codec in this browser.', 5000);
+      return;
+    }
+    // Switch to mesh tab if not already (recording requires c-mesh to be visible
+    // and rendering — captureStream returns blank frames for hidden canvases)
+    if (window.activeTab !== 'mesh' && typeof window.switchTab === 'function') {
+      window.switchTab('mesh');
+      // give the layout a frame to settle
+      await new Promise(r => setTimeout(r, 200));
+    }
+    // Pause any normal playback
+    if (window.meshPlaying) window.meshPlaying = false;
+
+    const canvas = document.getElementById('c-mesh');
+    if (!canvas) {
+      if (typeof window._showToast === 'function') window._showToast('Mesh canvas not found.', 5000);
+      return;
+    }
+    const fps = Math.max(1, Math.round((window.meshMetadata && window.meshMetadata.playback_fps) || 25));
+    let stream;
+    try { stream = canvas.captureStream(fps); }
+    catch (err) {
+      if (typeof window._showToast === 'function') window._showToast('Canvas capture failed: ' + err.message, 6000);
+      return;
+    }
+
+    recState.active = true;
+    recState.cancelled = false;
+    recState.chunks = [];
+
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+    } catch (err) {
+      recState.active = false;
+      if (typeof window._showToast === 'function') window._showToast('MediaRecorder failed: ' + err.message, 6000);
+      return;
+    }
+    recState.recorder = recorder;
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recState.chunks.push(e.data); };
+    recorder.onerror = (e) => { console.error('MediaRecorder error:', e); };
+
+    showOverlay(true);
+    setTitle('Recording…');
+    setProgress(0, 'Frame 0 / ' + window.meshTotalFrames, mime);
+    recorder.start(1000);
+
+    // Drive playback through _meshUpdateFrame at fps
+    const total = window.meshTotalFrames;
+    const dur = 1000 / fps;
+    const tStart = performance.now();
+    let frame = 0;
+
+    await new Promise((resolve) => {
+      function tick() {
+        if (recState.cancelled) { resolve(); return; }
+        if (frame >= total) { resolve(); return; }
+        try { window._meshUpdateFrame(frame); } catch(_) {}
+        setProgress(Math.round(100 * frame / total),
+          'Frame ' + (frame + 1) + ' / ' + total,
+          fps + ' fps • ' + mime);
+        frame++;
+        const expected = tStart + frame * dur;
+        const delay = Math.max(0, expected - performance.now());
+        setTimeout(tick, delay);
+      }
+      tick();
+    });
+
+    await new Promise(r => setTimeout(r, 400));
+
+    const stopped = new Promise(res => { recorder.onstop = () => res(); });
+    try { recorder.stop(); } catch(_) {}
+    await stopped;
+
+    try { stream.getTracks().forEach(t => t.stop()); } catch(_) {}
+    recState.recorder = null;
+    recState.active = false;
+
+    if (recState.cancelled) {
+      showOverlay(false);
+      if (typeof window._showToast === 'function') window._showToast('Recording cancelled.', 3000);
+      return;
+    }
+
+    const blob = new Blob(recState.chunks, { type: mime });
+    recState.chunks = [];
+
+    setTitle('Transcoding to MP4…');
+    setProgress(0, 'Uploading to server…', 'WebM size: ' + (blob.size / 1024 / 1024).toFixed(1) + ' MB');
+
+    try {
+      const mp4Url = await uploadAndTranscode(blob, mime);
+      setProgress(100, 'Ready — download starting', '');
+      setTitle('Done');
+      const a = document.createElement('a');
+      a.href = mp4Url; a.download = 'tactical_analysis.mp4';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => showOverlay(false), 1400);
+      if (typeof window._showToast === 'function') window._showToast('MP4 download started.', 4000);
+    } catch (err) {
+      setTitle('Transcode failed');
+      setProgress(0, err.message || 'Unknown error', 'Falling back to WebM…');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'tactical_analysis.webm';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setTimeout(() => showOverlay(false), 2500);
+      if (typeof window._showToast === 'function') window._showToast('Server transcode failed; WebM downloaded.', 6000);
+    }
+  };
+
+  window.meshCancelRecording = function() {
+    if (!recState.active) { showOverlay(false); return; }
+    recState.cancelled = true;
+    if (recState.recorder && recState.recorder.state !== 'inactive') {
+      try { recState.recorder.stop(); } catch(_) {}
+    }
+  };
+
+  async function uploadAndTranscode(blob, mime) {
+    const form = new FormData();
+    form.append('video', blob, 'recording.webm');
+    form.append('mime_type', mime);
+    let resp;
+    try { resp = await fetch('/transcode-to-mp4', { method: 'POST', body: form }); }
+    catch (err) { throw new Error('Network error: ' + err.message); }
+    if (!resp.ok) {
+      let detail = '';
+      try { detail = await resp.text(); } catch(_) {}
+      throw new Error('Server returned ' + resp.status + ': ' + (detail || resp.statusText).slice(0, 200));
+    }
+    const out = await resp.blob();
+    if (out.size === 0) throw new Error('Server returned an empty MP4');
+    return URL.createObjectURL(out);
+  }
+
+  // ── Enable features when mesh data lands ──────────────────────────────
+  // Wraps loadMeshData to unlock the Record button and re-check drawing readiness.
+  // Also does an immediate check in case data was already loaded before this IIFE ran.
+  function onMeshLoaded() {
+    const btn = document.getElementById('btn-record-mp4');
+    if (btn) btn.disabled = false;
+    // Wire pointer events now that we know data is present
+    wirePointerEvents();
+  }
+
+  function installLoadHook() {
+    if (typeof window.loadMeshData !== 'function') {
+      setTimeout(installLoadHook, 300);
+      return;
+    }
+    if (window.loadMeshData.__recordHooked) return;
+    const orig = window.loadMeshData;
+    const wrapped = function(data) {
+      const r = orig(data);
+      onMeshLoaded();
+      return r;
+    };
+    wrapped.__recordHooked = true;
+    window.loadMeshData = wrapped;
+    // If data is already loaded (page loaded with auto-restore), fire immediately
+    if (window.meshTotalFrames) onMeshLoaded();
+  }
+  installLoadHook();
+
+  console.log('[mesh-features] tactical drawings + MP4 recording loaded');
+})();
+</script>
+<script>
+// ╔══ BROADCAST TACTICAL TOOLS (shared engine, TACTICAL + MESH) — BROADCAST_TOOLS_V1 ══
+(function () {
+  'use strict';
+  if (typeof THREE === 'undefined') return;
+
+  let _glow = null;
+  function glowTex() {
+    if (_glow) return _glow;
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.55, 'rgba(255,255,255,0.5)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+    _glow = new THREE.CanvasTexture(c); return _glow;
+  }
+  function rr(c, x, y, w, h, r) {
+    c.beginPath(); c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  function labelSprite(text, color) {
+    const c = document.createElement('canvas'); c.width = 320; c.height = 72;
+    const x = c.getContext('2d');
+    x.font = 'bold 32px Sora, Arial';
+    const tw = x.measureText(text).width;
+    const bw = Math.min(312, tw + 44), bx = (320 - bw) / 2;
+    x.fillStyle = 'rgba(8,12,22,0.92)'; rr(x, bx, 10, bw, 52, 9); x.fill();
+    x.fillStyle = color; rr(x, bx, 10, 7, 52, 3); x.fill();
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(text, 160, 37);
+    const tex = new THREE.CanvasTexture(c);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+    sp.scale.set(5.0, 1.12, 1);
+    return sp;
+  }
+  function hexOf(c) {
+    if (c == null) return '#ffd400';
+    if (c.isColor) return '#' + c.getHexString();
+    if (typeof c === 'number') return '#' + (c >>> 0).toString(16).padStart(6, '0');
+    return c;
+  }
+  function disposeGroup(g) {
+    for (let i = g.children.length - 1; i >= 0; i--) {
+      const o = g.children[i]; g.remove(o);
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (o.material.map && o.material.map.dispose) o.material.map.dispose();
+        if (o.material.dispose) o.material.dispose();
+      }
+    }
+  }
+  function shaft(points, thickness, color, dashed, y) {
+    const out = [];
+    const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: 0.96 });
+    const v3 = points.map(p => new THREE.Vector3(p[0], y, p[1]));
+    const curve = v3.length === 2
+      ? new THREE.LineCurve3(v3[0], v3[1])
+      : new THREE.CatmullRomCurve3(v3, false, 'catmullrom', 0.12);
+    const L = curve.getLength();
+    if (L < 1e-3) return { meshes: out, mat };
+    if (!dashed) {
+      const segs = Math.max(8, Math.min(220, Math.round(L * 6)));
+      out.push(new THREE.Mesh(new THREE.TubeGeometry(curve, segs, thickness, 8, false), mat));
+    } else {
+      const dash = Math.max(0.5, thickness * 8), gap = dash * 0.65, step = dash + gap;
+      const n = Math.max(1, Math.floor(L / step));
+      for (let i = 0; i < n; i++) {
+        const t0 = (i * step) / L, t1 = Math.min(1, (i * step + dash) / L);
+        if (t1 <= t0) continue;
+        const sub = new THREE.CatmullRomCurve3([curve.getPoint(t0), curve.getPoint((t0 + t1) / 2), curve.getPoint(t1)]);
+        out.push(new THREE.Mesh(new THREE.TubeGeometry(sub, 6, thickness, 8, false), mat));
+      }
+    }
+    return { meshes: out, mat };
+  }
+  function arrowHead(a, b, thickness, color, y) {
+    const dir = new THREE.Vector3(b[0] - a[0], 0, b[1] - a[1]);
+    const len = dir.length(); if (len < 1e-4) return null; dir.normalize();
+    const hl = Math.max(thickness * 5, 1.0), hr = Math.max(thickness * 3, 0.6);
+    const m = new THREE.Mesh(new THREE.ConeGeometry(hr, hl, 18),
+      new THREE.MeshBasicMaterial({ color, depthWrite: false }));
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    m.position.set(b[0] - dir.x * hl * 0.5, y, b[1] - dir.z * hl * 0.5);
+    return m;
+  }
+
+  const INST = {};
+
+  function makeInstance(ctx) {
+    const root = new THREE.Group(); root.name = 'bt-' + ctx.key; ctx.scene.add(root);
+    const autoRoot = new THREE.Group(); autoRoot.name = 'bt-auto-' + ctx.key; ctx.scene.add(autoRoot);
+    const drawings = [];
+    const auto = {};
+    const ray = new THREE.Raycaster();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.08);
+    let tool = 'select';
+    let markersOn = false;
+    let pd = false, draft = null, preview = null, chain = null, downXY = null;
+
+    const uiColor = () => { const e = document.getElementById(ctx.key + '-bt-color'); return e ? e.value : '#ffd400'; };
+    const uiThick = () => { const e = document.getElementById(ctx.key + '-bt-size'); const s = e ? +e.value : 4; return 0.07 + (s - 1) / 9 * 0.33; };
+    const uiDashed = () => { const e = document.getElementById(ctx.key + '-bt-dash'); return e ? e.checked : false; };
+
+    function ndc(ev) {
+      const r = ctx.canvas.getBoundingClientRect();
+      return new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    }
+    function pitchPt(ev) {
+      ray.setFromCamera(ndc(ev), ctx.camera);
+      const hit = new THREE.Vector3();
+      return ray.ray.intersectPlane(plane, hit) ? [hit.x, hit.z] : null;
+    }
+    function pickPlayer(ev) {
+      const players = ctx.getPlayers(); if (!players.length) return null;
+      ray.setFromCamera(ndc(ev), ctx.camera);
+      const objs = [], map = new Map();
+      players.forEach(p => { if (!p.object) return; p.object.traverse(o => { if (o.isMesh) { objs.push(o); map.set(o.uuid, p.id); } }); });
+      const hits = ray.intersectObjects(objs, false);
+      return hits.length ? map.get(hits[0].object.uuid) : null;
+    }
+    const findP = id => ctx.getPlayers().find(p => String(p.id) === String(id));
+    const pPos = id => { const p = findP(id); return p ? [p.x, p.z] : null; };
+    const pColor = id => { const p = findP(id); return p ? hexOf(p.color) : '#ffd400'; };
+    const pName = id => { const p = findP(id); return p && p.name ? p.name : ('#' + id); };
+
+    function build(d) {
+      const g = new THREE.Group(); g.userData.d = d; d.group = g; root.add(g);
+      if (d.type === 'spotlight' || d.type === 'connect' || d.type === 'label') { rebuild(d); return g; }
+      if (d.type === 'arrow') rebuildArrow(g, d);
+      else if (d.type === 'zone') rebuildZone(g, d);
+      return g;
+    }
+    function rebuild(d) {
+      const g = d.group; if (!g) return;
+      if (d.type === 'spotlight') {
+        const col = d.color || pColor(d.anchors[0]);
+        const p = pPos(d.anchors[0]);
+        if (!p) { g.visible = false; return; }
+        if (!g.userData.built) {
+          const glow = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4),
+            new THREE.MeshBasicMaterial({ map: glowTex(), color: col, transparent: true, opacity: 0.72, depthWrite: false, blending: THREE.AdditiveBlending }));
+          glow.rotation.x = -Math.PI / 2; glow.position.y = 0.05; glow.name = 'glow';
+          const ring = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.2, 48),
+            new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
+          ring.rotation.x = -Math.PI / 2; ring.position.y = 0.07; ring.name = 'ring';
+          g.add(glow); g.add(ring); g.userData.built = true;
+        } else {
+          g.getObjectByName('glow').material.color.set(col);
+          g.getObjectByName('ring').material.color.set(col);
+        }
+        g.visible = true; g.position.set(p[0], 0, p[1]);
+      } else if (d.type === 'label') {
+        const p = pPos(d.anchors[0]);
+        if (!p) { g.visible = false; return; }
+        if (!g.userData.built || g.userData.txt !== d.name) {
+          disposeGroup(g);
+          g.add(labelSprite(d.name || pName(d.anchors[0]), d.color || pColor(d.anchors[0])));
+          g.userData.built = true; g.userData.txt = d.name;
+        }
+        g.visible = true; g.position.set(p[0], ctx.labelY || 3.0, p[1]);
+      } else if (d.type === 'connect') {
+        disposeGroup(g);
+        const pts = d.anchors.map(pPos).filter(Boolean);
+        if (pts.length < 2) { g.visible = false; return; }
+        g.visible = true;
+        shaft(pts, d.thickness, d.color, d.dashed, 0.09).meshes.forEach(m => g.add(m));
+        pts.forEach(pt => {
+          const dot = new THREE.Mesh(new THREE.CircleGeometry(d.thickness * 1.8, 20),
+            new THREE.MeshBasicMaterial({ color: d.color, depthWrite: false }));
+          dot.rotation.x = -Math.PI / 2; dot.position.set(pt[0], 0.095, pt[1]); g.add(dot);
+        });
+      }
+    }
+    function rebuildArrow(g, d) {
+      disposeGroup(g);
+      shaft(d.points, d.thickness, d.color, d.dashed, 0.09).meshes.forEach(m => g.add(m));
+      const h = arrowHead(d.points[d.points.length - 2], d.points[d.points.length - 1], d.thickness, d.color, 0.09);
+      if (h) g.add(h);
+    }
+    function rebuildZone(g, d) {
+      disposeGroup(g);
+      const [cx, cz] = d.points[0], [ex, ez] = d.points[1];
+      const r = Math.max(0.7, Math.hypot(ex - cx, ez - cz));
+      const fill = new THREE.Mesh(new THREE.CircleGeometry(r, 56),
+        new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide }));
+      fill.rotation.x = -Math.PI / 2; fill.position.set(cx, 0.06, cz);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.97, r, 64),
+        new THREE.MeshBasicMaterial({ color: d.color, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2; ring.position.set(cx, 0.075, cz);
+      g.add(fill); g.add(ring);
+    }
+    function ensureAuto(id, col) {
+      if (!auto[id]) {
+        const g = new THREE.Group();
+        const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 2.8),
+          new THREE.MeshBasicMaterial({ map: glowTex(), color: col, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+        glow.rotation.x = -Math.PI / 2; glow.name = 'glow';
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 40),
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+        ring.rotation.x = -Math.PI / 2; ring.name = 'ring';
+        g.add(glow); g.add(ring); autoRoot.add(g);
+        auto[id] = { group: g, glow, ring };
+      }
+      return auto[id];
+    }
+    function syncAuto() {
+      autoRoot.visible = markersOn && ctx.useAuto;
+      if (!autoRoot.visible) return;
+      const liveSet = new Set();
+      ctx.getPlayers().forEach(p => {
+        liveSet.add(String(p.id)); const col = hexOf(p.color); const a = ensureAuto(p.id, col);
+        a.glow.material.color.set(col); a.ring.material.color.set(col);
+        a.group.position.set(p.x, 0.045, p.z); a.group.visible = true;
+      });
+      Object.keys(auto).forEach(id => { if (!liveSet.has(String(id))) auto[id].group.visible = false; });
+    }
+    function tick() {
+      if (!ctx.isActive()) return;
+      syncAuto();
+      for (const d of drawings) if (d.type === 'spotlight' || d.type === 'connect' || d.type === 'label') rebuild(d);
+    }
+    function add(rec) {
+      rec.id = 'd' + Date.now() + Math.random().toString(36).slice(2, 6);
+      drawings.push(rec); build(rec); count();
+      return rec;
+    }
+    function remove(d) {
+      const i = drawings.indexOf(d); if (i < 0) return;
+      drawings.splice(i, 1); root.remove(d.group); disposeGroup(d.group); count();
+    }
+    function undo() { const d = drawings.pop(); if (!d) return; root.remove(d.group); disposeGroup(d.group); count(); }
+    function clearAll(silent) {
+      if (!drawings.length) return;
+      if (!silent && !confirm('Clear all ' + drawings.length + ' drawing(s)?')) return;
+      drawings.slice().forEach(d => { root.remove(d.group); disposeGroup(d.group); });
+      drawings.length = 0; chain = null; count();
+    }
+    function count() { const e = document.getElementById(ctx.key + '-bt-count'); if (e) e.textContent = drawings.length + ' drawing' + (drawings.length === 1 ? '' : 's'); }
+    function toggleSpot(id) {
+      const ex = drawings.find(d => d.type === 'spotlight' && String(d.anchors[0]) === String(id));
+      if (ex) { remove(ex); return; }
+      add({ type: 'spotlight', anchors: [id], color: null });
+    }
+    function doLabel(id) {
+      const cur = drawings.find(d => d.type === 'label' && String(d.anchors[0]) === String(id));
+      const def = cur ? cur.name : pName(id).replace(/^#/, '');
+      const txt = window.prompt('Label for player ' + id + '  (e.g. "24 James"):', def);
+      if (txt == null) return;
+      if (cur) remove(cur);
+      if (txt.trim() === '') return;
+      add({ type: 'label', anchors: [id], name: txt.trim(), color: null });
+    }
+    function connectClick(id) {
+      if (!chain) { chain = { anchors: [String(id)] }; return; }
+      if (chain.anchors[chain.anchors.length - 1] === String(id)) return;
+      chain.anchors.push(String(id));
+      if (!chain.rec) chain.rec = add({ type: 'connect', anchors: chain.anchors.slice(), color: uiColor(), thickness: uiThick(), dashed: uiDashed() });
+      else { chain.rec.anchors = chain.anchors.slice(); rebuild(chain.rec); }
+    }
+    function onDown(ev) {
+      if (!ctx.isActive() || tool === 'select') return;
+      if (!ctx.ready()) { if (window._showToast) window._showToast(ctx.notReady, 3500); return; }
+      downXY = [ev.clientX, ev.clientY];
+      if (tool === 'arrow' || tool === 'zone') {
+        const pt = pitchPt(ev); if (!pt) { downXY = null; return; }
+        ev.preventDefault(); pd = true; draft = { type: tool, points: [pt, pt] };
+      }
+    }
+    function onMove(ev) {
+      if (!pd || !draft || !ctx.isActive()) return;
+      const pt = pitchPt(ev); if (!pt) return;
+      draft.points[1] = pt;
+      if (preview) { root.remove(preview); disposeGroup(preview); preview = null; }
+      preview = new THREE.Group();
+      if (draft.type === 'arrow') rebuildArrow(preview, { points: draft.points, color: uiColor(), thickness: uiThick(), dashed: uiDashed() });
+      else rebuildZone(preview, { points: draft.points, color: uiColor() });
+      root.add(preview);
+    }
+    function onUp(ev) {
+      if (!ctx.isActive() || tool === 'select') { pd = false; draft = null; downXY = null; return; }
+      if (preview) { root.remove(preview); disposeGroup(preview); preview = null; }
+      const isClick = downXY ? Math.hypot(ev.clientX - downXY[0], ev.clientY - downXY[1]) < 6 : false;
+      if (tool === 'arrow' || tool === 'zone') {
+        if (pd && draft && !isClick) add({ type: draft.type, points: draft.points.slice(), color: uiColor(), thickness: uiThick(), dashed: uiDashed() });
+        pd = false; draft = null; downXY = null; return;
+      }
+      downXY = null;
+      if (!isClick) return;
+      const id = pickPlayer(ev); if (id == null) return;
+      if (tool === 'spotlight') toggleSpot(id);
+      else if (tool === 'label') doLabel(id);
+      else if (tool === 'connect') connectClick(id);
+    }
+    function setTool(t) {
+      tool = t; if (t !== 'connect') chain = null;
+      document.querySelectorAll('[data-bt="' + ctx.key + '"]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+      const dr = document.getElementById(ctx.key + '-bt-dash-row');
+      if (dr) dr.style.display = (t === 'arrow' || t === 'connect') ? 'flex' : 'none';
+      if (ctx.controls) ctx.controls.enabled = (t === 'select');
+      ctx.canvas.style.cursor = t === 'select' ? '' : (t === 'arrow' || t === 'zone') ? 'crosshair' : 'pointer';
+    }
+    ctx.canvas.addEventListener('pointerdown', onDown);
+    ctx.canvas.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    ctx.canvas.addEventListener('contextmenu', e => { if (ctx.isActive() && tool === 'connect') { e.preventDefault(); chain = null; } });
+    window.addEventListener('keydown', e => { if (e.code === 'Escape') chain = null; });
+    return { setTool, undo, clearAll, getTool: () => tool, tick, setMarkers: v => { markersOn = !!v; } };
+  }
+
+  (function loop() { requestAnimationFrame(loop); for (const k in INST) { try { INST[k].tick(); } catch (e) { } } })();
+
+  window.BT = {
+    tool: (k, t) => INST[k] && INST[k].setTool(t),
+    undo: k => INST[k] && INST[k].undo(),
+    clear: k => INST[k] && INST[k].clearAll(false),
+    setMarkers: (k, v) => INST[k] && INST[k].setMarkers(v),
+    activeTool: k => (INST[k] ? INST[k].getTool() : 'select'),
+    reset: () => { for (const k in INST) try { INST[k].clearAll(true); } catch (e) { } },
+  };
+
+  function bootTac() {
+    if (INST.tac) return;
+    if (typeof tacScene === 'undefined' || !tacScene) return;
+    INST.tac = makeInstance({
+      key: 'tac', scene: tacScene, camera: tacCam, controls: tacCtrl, canvas: tacCanvas,
+      useAuto: false, labelY: 4.6,
+      isActive: () => activeTab === 'tactical',
+      ready: () => !!tacFrameData, notReady: 'Load a result JSON first',
+      getPlayers: () => {
+        const out = [];
+        for (const id in tacPool) {
+          const g = tacPool[id]; if (!g.visible) continue;
+          out.push({ id, object: g, x: g.position.x, z: g.position.z, color: hexOf(g.userData.color), kind: g.userData.kind, name: null });
+        }
+        return out;
+      },
+    });
+  }
+  function bootMesh() {
+    if (INST.mesh) return;
+    if (typeof meshScene === 'undefined' || !meshScene || typeof meshCamera === 'undefined' || !meshCamera) return;
+    const mc = document.getElementById('c-mesh'); if (!mc) return;
+    INST.mesh = makeInstance({
+      key: 'mesh', scene: meshScene, camera: meshCamera, controls: meshCtrl, canvas: mc,
+      useAuto: true, labelY: 2.8,
+      isActive: () => activeTab === 'mesh',
+      ready: () => !!meshTotalFrames, notReady: 'Load a mesh JSON first',
+      getPlayers: () => {
+        const out = [];
+        for (const tid in meshTrackRecs) {
+          const r = meshTrackRecs[tid]; if (!r.mesh.visible) continue;
+          out.push({ id: tid, object: r.mesh, x: r.mesh.position.x, z: r.mesh.position.z, color: _meshTeamColorForTrack(+tid), kind: r.kind, name: null });
+        }
+        return out;
+      },
+    });
+  }
+  bootTac();
+  (function waitMesh() { bootMesh(); if (!INST.mesh) setTimeout(waitMesh, 400); })();
+  console.log('[broadcast-tools] loaded');
+})();
+</script>
+</body>
+</html>

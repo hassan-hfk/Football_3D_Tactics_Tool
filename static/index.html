@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Football 3D Tactics</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0e1a; color:#e0e6f0; font-family:'Segoe UI',sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+#topbar { height:44px; background:#111827; border-bottom:1px solid #1f2937; display:flex; align-items:center; padding:0 16px; gap:12px; flex-shrink:0; flex-wrap:wrap; }
+#topbar h1 { font-size:14px; font-weight:700; color:#60a5fa; margin-right:8px; }
+button { padding:5px 12px; border:none; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; }
+.btn-blue { background:#3b82f6; color:#fff; } .btn-green { background:#10b981; color:#fff; }
+select { padding:4px 8px; background:#374151; color:#e0e6f0; border:1px solid #4b5563; border-radius:5px; font-size:12px; }
+input[type=color] { width:32px; height:28px; border:none; border-radius:4px; cursor:pointer; }
+label { font-size:12px; color:#9ca3af; display:flex; align-items:center; gap:5px; }
+#main { flex:1; display:flex; overflow:hidden; }
+#video-panel { width:50%; border-right:2px solid #1f2937; position:relative; background:#000; display:flex; align-items:center; justify-content:center; }
+#vid { width:100%; height:100%; object-fit:contain; display:none; }
+#vid-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; }
+#vid-overlay p { color:#6b7280; font-size:13px; }
+.upload-lbl { background:#3b82f6; color:#fff; padding:9px 22px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; }
+#det-canvas { position:absolute; inset:0; pointer-events:none; display:none; }
+#three-panel { flex:1; position:relative; }
+#c { display:block; width:100%; height:100%; }
+#hud { position:absolute; top:8px; right:8px; background:rgba(17,24,39,.85); border-radius:8px; padding:8px 12px; font-size:11px; color:#9ca3af; line-height:1.9; }
+#hud b { color:#e0e6f0; }
+#cam-row { position:absolute; top:8px; left:8px; display:flex; flex-direction:column; gap:4px; }
+.cbtn { background:rgba(17,24,39,.85); color:#d1d5db; border:1px solid #374151; border-radius:5px; padding:4px 10px; font-size:11px; cursor:pointer; }
+.cbtn:hover { border-color:#3b82f6; color:#93c5fd; }
+#playbar { height:40px; background:#111827; border-top:1px solid #1f2937; display:flex; align-items:center; padding:0 14px; gap:10px; flex-shrink:0; }
+#play-btn { width:30px; height:30px; border-radius:50%; background:#3b82f6; border:none; cursor:pointer; font-size:13px; color:#fff; flex-shrink:0; }
+#timeline { flex:1; height:5px; background:#374151; border-radius:3px; cursor:pointer; }
+#tl-fill { height:100%; background:#3b82f6; border-radius:3px; width:0%; pointer-events:none; }
+#time-lbl { font-size:11px; color:#9ca3af; white-space:nowrap; min-width:100px; text-align:right; }
+.spd { padding:3px 7px; font-size:11px; background:#374151; color:#9ca3af; border:1px solid #4b5563; border-radius:4px; cursor:pointer; }
+.spd.on { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+#prog-overlay { position:fixed; inset:0; background:rgba(10,14,26,.93); display:none; align-items:center; justify-content:center; z-index:200; }
+.prog-card { background:#1f2937; border-radius:14px; padding:36px 44px; text-align:center; width:360px; }
+.prog-card h2 { font-size:17px; color:#f9fafb; margin-bottom:6px; }
+#prog-msg { font-size:12px; color:#9ca3af; margin-bottom:16px; }
+#prog-wrap { background:#374151; border-radius:8px; height:9px; overflow:hidden; margin-bottom:8px; }
+#prog-bar { background:#3b82f6; height:100%; border-radius:8px; width:0%; transition:width .3s; }
+#prog-pct { font-size:24px; font-weight:700; color:#60a5fa; }
+#prog-stats { font-size:11px; color:#6b7280; margin-top:8px; line-height:1.8; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>⚽ Football 3D Tactics</h1>
+  <button class="btn-blue" onclick="document.getElementById('fi').click()">Upload Video</button>
+  <input type="file" id="fi" accept=".mp4,.avi,.mov,.mkv" onchange="uploadVideo(this)" style="display:none">
+  <button class="btn-blue" onclick="document.getElementById('fj').click()">Open Result JSON</button>
+  <input type="file" id="fj" accept=".json" onchange="openResultJson(this)" style="display:none">
+  <div style="width:1px;height:20px;background:#374151"></div>
+  <label>Team A <input type="color" id="colA" value="#CC2222" onchange="applyColors()"></label>
+  <label>Team B <input type="color" id="colB" value="#1144CC" onchange="applyColors()"></label>
+  <div style="width:1px;height:20px;background:#374151"></div>
+  <select onchange="setPreset(this.value)"><option value="broadcast">Broadcast</option><option value="top">Bird's Eye</option><option value="sideline">Sideline</option><option value="corner">Corner</option></select>
+  <label>World
+    <select id="worldSel" onchange="setWorld(this.value)">
+      <option value="cartoon">Cartoon</option>
+      <option value="realistic">Realistic</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="sw-ids" checked onchange="toggleIds(this.checked)"> IDs</label>
+  <label><input type="checkbox" id="sw-trails" checked onchange="toggleTrails(this.checked)"> Trails</label>
+  <label><input type="checkbox" id="sw-markers" checked onchange="toggleMarkers(this.checked)"> Markers</label>
+  <button class="btn-green" onclick="screenshot()" style="margin-left:auto">Screenshot</button>
+</div>
+
+<div id="main">
+  <div id="video-panel">
+    <video id="vid" muted></video>
+    <canvas id="det-canvas"></canvas>
+    <div id="vid-overlay">
+      <p>Upload a video to see the split view</p>
+      <label class="upload-lbl" for="fi2">Choose Video</label>
+      <input type="file" id="fi2" accept=".mp4,.avi,.mov,.mkv" onchange="uploadVideo(this)" style="display:none">
+    </div>
+  </div>
+  <div id="three-panel">
+    <canvas id="c"></canvas>
+    <div id="cam-row">
+      <button class="cbtn" onclick="setPreset('top')">Bird's Eye</button>
+      <button class="cbtn" onclick="setPreset('broadcast')">Broadcast</button>
+      <button class="cbtn" onclick="setPreset('sideline')">Sideline</button>
+      <button class="cbtn" onclick="setPreset('corner')">Corner</button>
+    </div>
+    <div id="hud">Frame <b id="h-frame">-</b><br>Time <b id="h-time">0.0</b>s<br>Players <b id="h-players">0</b><br>Homo <b id="h-homo">-</b></div>
+  </div>
+</div>
+
+<div id="playbar">
+  <button id="play-btn" onclick="togglePlay()">&#9654;</button>
+  <div id="timeline" onclick="seek(event)"><div id="tl-fill"></div></div>
+  <div style="display:flex;gap:4px">
+    <button class="spd on" onclick="setSpd(1,this)">1x</button>
+    <button class="spd" onclick="setSpd(2,this)">2x</button>
+    <button class="spd" onclick="setSpd(.5,this)">0.5x</button>
+  </div>
+  <span id="time-lbl">0.0s / 0.0s</span>
+</div>
+
+<div id="prog-overlay">
+  <div class="prog-card">
+    <h2>Processing Video</h2>
+    <p id="prog-msg">Uploading...</p>
+    <div id="prog-wrap"><div id="prog-bar"></div></div>
+    <div id="prog-pct">0%</div>
+    <div id="prog-stats"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════
+// SCENE
+// ═══════════════════════════════════════
+const canvas3d = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas:canvas3d,antialias:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.setClearColor(0x0a0e1a);
+const scene  = new THREE.Scene();
+scene.fog    = new THREE.Fog(0x0a0e1a,100,160);
+const camera = new THREE.PerspectiveCamera(50,1,0.1,300);
+camera.position.set(0,35,50);
+const ctrl = new THREE.OrbitControls(camera,canvas3d);
+ctrl.enableDamping=true; ctrl.dampingFactor=0.07; ctrl.maxPolarAngle=Math.PI/2.02;
+const ambient = new THREE.AmbientLight(0xffffff,0.7); scene.add(ambient);
+const sun = new THREE.DirectionalLight(0xfff8e0,1.0);
+sun.position.set(10,30,10); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=sun.shadow.camera.bottom=-70;
+sun.shadow.camera.right=sun.shadow.camera.top=70;
+scene.add(sun);
+const hemi = new THREE.HemisphereLight(0xbfd8ff,0x3a5a2e,0); scene.add(hemi);
+
+
+// ═══════════════════════════════════════
+// PITCH (120x70m Roboflow template)
+// ═══════════════════════════════════════
+let PW=105, PH=68;   // pitch size comes from result metadata (pnlcalib=105x68, old yolo=120x70)
+function wp(x,y){ return [x-PW/2, y-PH/2]; }
+// FIFA markings: penalty box 16.5x40.32, goal box 5.5x18.32, spot 11m, circle 9.15
+const BOX_D=16.5, BOX_W=40.32, GBOX_D=5.5, GBOX_W=18.32, SPOT=11, CIRC=9.15;
+function buildCartoonPitch(){
+  const g=new THREE.Group(); g.name='pitch';
+  for(let i=0;i<10;i++){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(PW/10,PH),new THREE.MeshLambertMaterial({color:i%2?0x267026:0x2d7a2d}));
+    m.rotation.x=-Math.PI/2; m.receiveShadow=true; m.position.set(-PW/2+PW/20+i*PW/10,0,0); g.add(m);
+  }
+  const lm=new THREE.LineBasicMaterial({color:0xffffff});
+  const ln=pts=>g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x,z])=>new THREE.Vector3(x,.02,z))),lm));
+  const rc=(cx,cz,w,h)=>{const hw=w/2,hh=h/2;ln([[cx-hw,cz-hh],[cx+hw,cz-hh],[cx+hw,cz+hh],[cx-hw,cz+hh],[cx-hw,cz-hh]]);};
+  const ci=(cx,cz,r)=>{const p=[];for(let i=0;i<=64;i++){const a=i/64*Math.PI*2;p.push([cx+Math.cos(a)*r,cz+Math.sin(a)*r]);}ln(p);};
+  const dt=(x,z)=>{const m=new THREE.Mesh(new THREE.CircleGeometry(.3,16),new THREE.MeshBasicMaterial({color:0xffffff}));m.rotation.x=-Math.PI/2;m.position.set(x,.03,z);g.add(m);};
+  ln([wp(0,0),wp(PW,0),wp(PW,PH),wp(0,PH),wp(0,0)]); ln([wp(PW/2,0),wp(PW/2,PH)]);
+  ci(...wp(PW/2,PH/2),CIRC); dt(...wp(PW/2,PH/2));
+  rc(...wp(BOX_D/2,PH/2),BOX_D,BOX_W); rc(...wp(GBOX_D/2,PH/2),GBOX_D,GBOX_W); dt(...wp(SPOT,PH/2));
+  rc(...wp(PW-BOX_D/2,PH/2),BOX_D,BOX_W); rc(...wp(PW-GBOX_D/2,PH/2),GBOX_D,GBOX_W); dt(...wp(PW-SPOT,PH/2));
+  const gW=7.32,gd=1.8,yG=(PH-gW)/2;
+  ln([wp(0,yG),wp(-gd,yG),wp(-gd,yG+gW),wp(0,yG+gW)]);
+  ln([wp(PW,yG),wp(PW+gd,yG),wp(PW+gd,yG+gW),wp(PW,yG+gW)]);
+  scene.add(g); return g;
+}
+buildCartoonPitch();
+
+
+// ═══════════════════════════════════════
+// CARTOON MANNEQUIN
+// ═══════════════════════════════════════
+function makeMannequin(color){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshLambertMaterial({color});
+  const skn=new THREE.MeshLambertMaterial({color:0xf0c8a0});
+  const drk=new THREE.MeshLambertMaterial({color:0x1a2535});
+  const blk=new THREE.MeshLambertMaterial({color:0x111111});
+  const p=(geo,m,x,y,z,rx,rz)=>{const me=new THREE.Mesh(geo,m);me.position.set(x,y,z);if(rx)me.rotation.x=rx;if(rz)me.rotation.z=rz;me.castShadow=true;g.add(me);};
+  p(new THREE.CylinderGeometry(.115,.1,.46,10),mat,0,.43,0);
+  p(new THREE.CylinderGeometry(.06,.07,.1,8),skn,0,.70,0);
+  p(new THREE.SphereGeometry(.135,12,10),skn,0,.83,0);
+  p(new THREE.SphereGeometry(.136,12,6,0,Math.PI*2,0,Math.PI*.45),new THREE.MeshLambertMaterial({color:0x3a2010}),0,.83,0);
+  p(new THREE.CylinderGeometry(.05,.045,.34,7),mat,-.17,.52,0,0,.5);
+  p(new THREE.CylinderGeometry(.05,.045,.34,7),mat,.17,.52,0,0,-.5);
+  p(new THREE.CylinderGeometry(.06,.055,.32,8),drk,-.07,.16,0);
+  p(new THREE.CylinderGeometry(.06,.055,.32,8),drk,.07,.16,0);
+  p(new THREE.BoxGeometry(.1,.06,.16),blk,-.07,.03,.04);
+  p(new THREE.BoxGeometry(.1,.06,.16),blk,.07,.03,.04);
+  const sdw=new THREE.Mesh(new THREE.CircleGeometry(.25,16),new THREE.MeshBasicMaterial({color:0,opacity:.3,transparent:true}));
+  sdw.rotation.x=-Math.PI/2; sdw.position.y=.001; g.add(sdw);
+  const mk=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.08,20),new THREE.MeshBasicMaterial({color}));
+  mk.name='marker'; mk.position.y=.04; g.add(mk);
+  const pin=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,.04,0),new THREE.Vector3(0,2.2,0)]),new THREE.LineBasicMaterial({color,opacity:.6,transparent:true}));
+  pin.name='pin'; g.add(pin);
+  const cv=document.createElement('canvas'); cv.width=64; cv.height=32;
+  const lctx=cv.getContext('2d'), ltex=new THREE.CanvasTexture(cv);
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:ltex,transparent:true,depthTest:false}));
+  spr.scale.set(2.5,1.2,1); spr.position.y=3.5; spr.name='label'; g.add(spr);
+  g.userData={lctx,ltex,color,target:new THREE.Vector3()};
+  g.scale.set(2,2,2); g.visible=false; scene.add(g); return g;
+}
+
+function setLabel(g,id){
+  const{lctx,ltex}=g.userData;
+  lctx.clearRect(0,0,64,32); lctx.fillStyle='#fff'; lctx.font='bold 18px Arial';
+  lctx.textAlign='center'; lctx.fillText('#'+id,32,22); ltex.needsUpdate=true;
+}
+
+function recolorMannequin(g,hex){
+  g.traverse(c=>{
+    if(!c.isMesh&&c.type!=='Line') return;
+    const v=c.material.color?c.material.color.getHex():-1;
+    if(v!==0xf0c8a0&&v!==0x1a2535&&v!==0x111111&&v!==0x3a2010&&v!==0)
+      if(c.material.color) c.material.color.setHex(hex);
+  });
+  g.userData.color=hex;
+}
+
+
+// ═══════════════════════════════════════
+// REALISTIC JOINTED CAPSULE FIGURE
+// ═══════════════════════════════════════
+const H={hip:0,rhip:1,rknee:2,rank:3,lhip:4,lknee:5,lank:6,spine:7,thorax:8,neck:9,head:10,lsh:11,lelb:12,lwr:13,rsh:14,relb:15,rwr:16};
+const RL={spine:0.50,hips:0.20,sh:0.36,uarm:0.28,farm:0.26,thigh:0.44,shin:0.44,foot:0.18};
+const REAL_SCALE=1.0;
+const UP=new THREE.Vector3(0,1,0);
+
+function capsuleGeo(r,len){
+  const pts=[],seg=8;
+  for(let i=0;i<=seg;i++){const e=-Math.PI/2+(i/seg)*(Math.PI/2);pts.push(new THREE.Vector2(Math.cos(e)*r,-len/2+Math.sin(e)*r));}
+  for(let i=0;i<=seg;i++){const e=(i/seg)*(Math.PI/2);pts.push(new THREE.Vector2(Math.cos(e)*r,len/2+Math.sin(e)*r));}
+  const g=new THREE.LatheGeometry(pts,12); g.computeVertexNormals(); return g;
+}
+
+function setBone(mesh,a,b){
+  const d=new THREE.Vector3().subVectors(b,a);
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(UP,d.normalize());
+}
+
+function setBone3D(mesh,a,b,restLen){
+  const d=new THREE.Vector3().subVectors(b,a);
+  const len=d.length();
+  if(len<0.001){ return; }
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(UP,d.clone().normalize());
+  mesh.scale.set(1,Math.max(0.2,len/restLen),1);
+}
+
+function makeRealPlayer(jerseyColor){
+  const g=new THREE.Group();
+  const jmat=new THREE.MeshStandardMaterial({color:jerseyColor,roughness:0.7,metalness:0});
+  const smat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.7,metalness:0});
+  const skin=new THREE.MeshStandardMaterial({color:0xe8b58c,roughness:0.8,metalness:0});
+  const hair=new THREE.MeshStandardMaterial({color:0x20140c,roughness:0.9,metalness:0});
+  const boot=new THREE.MeshStandardMaterial({color:0x111111,roughness:0.5,metalness:0});
+  const cap=(m,r,len)=>{const me=new THREE.Mesh(capsuleGeo(r,len),m);me.castShadow=true;g.add(me);return me;};
+  const sph=(m,r)=>{const me=new THREE.Mesh(new THREE.SphereGeometry(r,10,8),m);me.castShadow=true;g.add(me);return me;};
+  const B={
+    spine:cap(jmat,0.15,RL.spine), hips:cap(smat,0.15,RL.hips), sh:cap(jmat,0.08,RL.sh),
+    uarmL:cap(jmat,0.052,RL.uarm), farmL:cap(skin,0.043,RL.farm),
+    uarmR:cap(jmat,0.052,RL.uarm), farmR:cap(skin,0.043,RL.farm),
+    thighL:cap(skin,0.075,RL.thigh), shinL:cap(jmat,0.060,RL.shin),
+    thighR:cap(skin,0.075,RL.thigh), shinR:cap(jmat,0.060,RL.shin),
+    footL:cap(boot,0.05,RL.foot), footR:cap(boot,0.05,RL.foot)
+  };
+  const S={
+    shL:sph(jmat,0.08),shR:sph(jmat,0.08),
+    elL:sph(skin,0.047),elR:sph(skin,0.047),
+    knL:sph(skin,0.068),knR:sph(skin,0.068),
+    hip:sph(smat,0.12), head:sph(skin,0.108)
+  };
+  const hairMesh=new THREE.Mesh(new THREE.SphereGeometry(0.114,12,10,0,Math.PI*2,0,Math.PI*0.55),hair);
+  g.add(hairMesh);
+  const sdw=new THREE.Mesh(new THREE.CircleGeometry(0.45,16),new THREE.MeshBasicMaterial({color:0,opacity:.32,transparent:true,depthWrite:false}));
+  sdw.rotation.x=-Math.PI/2; sdw.position.y=0.01; g.add(sdw);
+  const mk=new THREE.Mesh(new THREE.CylinderGeometry(.28,.28,.04,16),new THREE.MeshBasicMaterial({color:jerseyColor}));
+  mk.name='marker'; mk.position.y=0.02; g.add(mk);
+  const cv=document.createElement('canvas'); cv.width=64; cv.height=32;
+  const lctx=cv.getContext('2d'),ltex=new THREE.CanvasTexture(cv);
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:ltex,transparent:true,depthTest:false}));
+  spr.scale.set(1.4,0.7,1); spr.position.y=2.3; spr.name='label'; g.add(spr);
+  g.userData={B,S,hairMesh,lctx,ltex,jmat,smat,target:new THREE.Vector3(),
+    recolor:(hex)=>{jmat.color.setHex(hex);mk.material.color.setHex(hex);}};
+  poseRestReal(g.userData);
+  g.scale.setScalar(REAL_SCALE);
+  g.visible=false;
+  scene.add(g);
+  return g;
+}
+
+function poseRestReal(ud){
+  const{B,S,hairMesh}=ud;
+  const hip=new THREE.Vector3(0,0,0);
+  const thorax=new THREE.Vector3(0,RL.spine,0);
+  const lhip=new THREE.Vector3(-RL.hips/2,0,0), rhip=new THREE.Vector3(RL.hips/2,0,0);
+  const lsh=new THREE.Vector3(-RL.sh/2,RL.spine,0), rsh=new THREE.Vector3(RL.sh/2,RL.spine,0);
+  const lknee=lhip.clone().add(new THREE.Vector3(0,-RL.thigh,0));
+  const rknee=rhip.clone().add(new THREE.Vector3(0,-RL.thigh,0));
+  const lank=lknee.clone().add(new THREE.Vector3(0,-RL.shin,0));
+  const rank=rknee.clone().add(new THREE.Vector3(0,-RL.shin,0));
+  const ltoe=lank.clone().add(new THREE.Vector3(0,-0.05,RL.foot));
+  const rtoe=rank.clone().add(new THREE.Vector3(0,-0.05,RL.foot));
+  const lelb=lsh.clone().add(new THREE.Vector3(-RL.uarm,0,0));
+  const relb=rsh.clone().add(new THREE.Vector3(RL.uarm,0,0));
+  const lwr=lelb.clone().add(new THREE.Vector3(0,-RL.farm,0));
+  const rwr=relb.clone().add(new THREE.Vector3(0,-RL.farm,0));
+  const headP=thorax.clone().add(new THREE.Vector3(0,0.25,0));
+  const minY=Math.min(lank.y,rank.y,ltoe.y,rtoe.y);
+  const ys=-minY+0.06;
+  [hip,thorax,lhip,rhip,lsh,rsh,lknee,rknee,lank,rank,ltoe,rtoe,lelb,relb,lwr,rwr,headP].forEach(v=>v.y+=ys);
+  setBone(B.spine,hip,thorax); setBone(B.hips,lhip,rhip); setBone(B.sh,lsh,rsh);
+  setBone(B.uarmL,lsh,lelb); setBone(B.farmL,lelb,lwr);
+  setBone(B.uarmR,rsh,relb); setBone(B.farmR,relb,rwr);
+  setBone(B.thighL,lhip,lknee); setBone(B.shinL,lknee,lank); setBone(B.footL,lank,ltoe);
+  setBone(B.thighR,rhip,rknee); setBone(B.shinR,rknee,rank); setBone(B.footR,rank,rtoe);
+  S.shL.position.copy(lsh); S.shR.position.copy(rsh);
+  S.elL.position.copy(lelb); S.elR.position.copy(relb);
+  S.knL.position.copy(lknee); S.knR.position.copy(rknee);
+  S.hip.position.copy(hip); S.head.position.copy(headP);
+  hairMesh.position.copy(headP).add(new THREE.Vector3(0,0.06,0));
+}
+
+// Drive figure from MotionBERT H36M-17 3D joints.
+// MotionBERT's own reference renderer (lib/utils/vismo.py, motion2video_3d)
+// does NOT plot (x,y,z) directly -- it plots (-x,-z,-y) with the comment
+// "axis transformation for visualization". That means, relative to the raw
+// output: X needs negating, Y needs negating to become "up", and Z needs
+// negating to become depth. For Three.js (Y-up) the equivalent is
+// threeX=-x, threeY=-y, threeZ=-z. The Y part matches what we verified
+// empirically (head has the most negative raw Y, ankles the most positive,
+// so -y puts the head above the feet). X and Z were previously left
+// unflipped, which kept left/right and front/back mirrored -- that is the
+// remaining cause of the contorted-looking poses.
+function pose3DReal(ud,j3){
+  const{B,S,hairMesh}=ud;
+
+  const V=i=>new THREE.Vector3(-j3[i][0], -j3[i][1], -j3[i][2]);
+
+  const pelvis = V(H.hip);
+
+  // Scale: normalise so torso length = 0.5m in local space
+  const torsoLen = Math.max(0.01, V(H.thorax).sub(pelvis).length());
+  const s = 0.5 / torsoLen;
+
+  // All joints: subtract pelvis, scale to metres
+  const P={};
+  for(const k in H){
+    P[k] = V(H[k]).sub(pelvis).multiplyScalar(s);
+  }
+
+  // Synthesise toe tips
+  const ff=new THREE.Vector3(0,-0.08,1).normalize();
+  P.ltoe=P.lank.clone().addScaledVector(ff,RL.foot);
+  P.rtoe=P.rank.clone().addScaledVector(ff,RL.foot);
+
+  // Lift so lowest joint sits just above the ground
+  const allY=Object.values(P).map(v=>v.y);
+  const minY=Math.min(...allY);
+  const ys=-minY+0.02;
+  for(const k in P) P[k].y+=ys;
+
+  setBone3D(B.spine, P.hip,   P.thorax, RL.spine);
+  setBone3D(B.hips,  P.lhip,  P.rhip,   RL.hips);
+  setBone3D(B.sh,    P.lsh,   P.rsh,    RL.sh);
+  setBone3D(B.uarmL, P.lsh,   P.lelb,   RL.uarm);
+  setBone3D(B.farmL, P.lelb,  P.lwr,    RL.farm);
+  setBone3D(B.uarmR, P.rsh,   P.relb,   RL.uarm);
+  setBone3D(B.farmR, P.relb,  P.rwr,    RL.farm);
+  setBone3D(B.thighL,P.lhip,  P.lknee,  RL.thigh);
+  setBone3D(B.shinL, P.lknee, P.lank,   RL.shin);
+  setBone3D(B.footL, P.lank,  P.ltoe,   RL.foot);
+  setBone3D(B.thighR,P.rhip,  P.rknee,  RL.thigh);
+  setBone3D(B.shinR, P.rknee, P.rank,   RL.shin);
+  setBone3D(B.footR, P.rank,  P.rtoe,   RL.foot);
+
+  S.shL.position.copy(P.lsh);  S.shR.position.copy(P.rsh);
+  S.elL.position.copy(P.lelb); S.elR.position.copy(P.relb);
+  S.knL.position.copy(P.lknee);S.knR.position.copy(P.rknee);
+  S.hip.position.copy(P.hip);  S.head.position.copy(P.head);
+  hairMesh.position.copy(P.head).add(new THREE.Vector3(0,0.06,0));
+}
+
+
+// ═══════════════════════════════════════
+// REALISTIC ENVIRONMENT
+// ═══════════════════════════════════════
+function buildRealPitch(){
+  const grp=new THREE.Group(); grp.name='pitchReal';
+  const sur=new THREE.Mesh(new THREE.PlaneGeometry(420,360),new THREE.MeshStandardMaterial({color:0x2f5e2c,roughness:1}));
+  sur.rotation.x=-Math.PI/2; sur.position.y=-.06; sur.receiveShadow=true; grp.add(sur);
+  const MARG=4, TW=PW+2*MARG, TH=PH+2*MARG;
+  const CW=2048,CH=Math.round(CW*TH/TW);
+  const cv=document.createElement('canvas'); cv.width=CW; cv.height=CH; const x=cv.getContext('2d');
+  x.fillStyle='#3c8a3a'; x.fillRect(0,0,CW,CH);
+  const sx=CW/TW, px=mx=>(mx+MARG)*sx, py=my=>(my+MARG)*sx;
+  for(let i=0;i<14;i++){x.fillStyle=i%2?'#3f9140':'#368534';x.fillRect(i*CW/14,0,CW/14+1,CH);}
+  x.strokeStyle='#f4f8f4'; x.lineWidth=Math.max(2,sx*.12); x.lineCap='round';
+  const rc=(a,b,c,d)=>{x.beginPath();x.rect(px(a),py(b),(c-a)*sx,(d-b)*sx);x.stroke();};
+  const ln=(a,b,c,d)=>{x.beginPath();x.moveTo(px(a),py(b));x.lineTo(px(c),py(d));x.stroke();};
+  const ci=(a,b,r)=>{x.beginPath();x.arc(px(a),py(b),r*sx,0,Math.PI*2);x.stroke();};
+  rc(0,0,PW,PH); ln(PW/2,0,PW/2,PH); ci(PW/2,PH/2,CIRC);
+  rc(0,(PH-BOX_W)/2,BOX_D,(PH+BOX_W)/2); rc(0,(PH-GBOX_W)/2,GBOX_D,(PH+GBOX_W)/2);
+  rc(PW-BOX_D,(PH-BOX_W)/2,PW,(PH+BOX_W)/2); rc(PW-GBOX_D,(PH-GBOX_W)/2,PW,(PH+GBOX_W)/2);
+  const tex=new THREE.CanvasTexture(cv); tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  const grass=new THREE.Mesh(new THREE.PlaneGeometry(TW,TH),new THREE.MeshStandardMaterial({map:tex,roughness:.92}));
+  grass.rotation.x=-Math.PI/2; grass.position.y=-.01; grass.receiveShadow=true; grp.add(grass);
+  const pm=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.4});
+  [wp(0,PH/2)[0],wp(PW,PH/2)[0]].forEach(gx=>{
+    const hw=7.32/2,gh=2.44;
+    [[-hw],[hw]].forEach(([hz])=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,gh,10),pm);p.position.set(gx,gh/2,hz);grp.add(p);});
+    const cb=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,2*hw,10),pm);cb.rotation.x=Math.PI/2;cb.position.set(gx,gh,0);grp.add(cb);
+  });
+  grp.visible=false; scene.add(grp); return grp;
+}
+function realSkyTex(){
+  const cv=document.createElement('canvas');cv.width=16;cv.height=256;const x=cv.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,'#5aa6ee');g.addColorStop(.55,'#9ccbf0');g.addColorStop(1,'#dcebf7');
+  x.fillStyle=g;x.fillRect(0,0,16,256);return new THREE.CanvasTexture(cv);
+}
+let _envCartoon=scene.getObjectByName('pitch');
+let _envReal=buildRealPitch();
+const _sky=realSkyTex();
+function rebuildPitches(){
+  const cv=_envCartoon.visible, rv=_envReal.visible;
+  scene.remove(_envCartoon); scene.remove(_envReal);
+  _envCartoon=buildCartoonPitch(); _envReal=buildRealPitch();
+  _envCartoon.visible=cv; _envReal.visible=rv;
+}
+
+function setWorld(w){
+  world=(w==='realistic')?'realistic':'cartoon';
+  document.getElementById('worldSel').value=world;
+  Object.values(pools.cartoon).forEach(m=>m.visible=false);
+  Object.values(pools.realistic).forEach(m=>m.visible=false);
+  pool=pools[world];
+  if(world==='realistic'){
+    _envCartoon.visible=false;_envReal.visible=true;
+    scene.background=_sky;scene.fog=new THREE.Fog(0xcfe1f2,170,380);
+    renderer.setClearColor(0xcfe1f2);
+    ambient.intensity=.5;sun.intensity=2.2;sun.color.setHex(0xfff3e0);hemi.intensity=.5;
+  } else {
+    _envReal.visible=false;_envCartoon.visible=true;
+    scene.background=null;scene.fog=new THREE.Fog(0x0a0e1a,100,160);
+    renderer.setClearColor(0x0a0e1a);
+    ambient.intensity=.7;sun.intensity=1.0;sun.color.setHex(0xfff8e0);hemi.intensity=0;
+  }
+  if(frameData) renderFrame(curFrame);
+}
+
+
+// ═══════════════════════════════════════
+// PLAYER POOL + TRAILS
+// ═══════════════════════════════════════
+const pools={cartoon:{},realistic:{}};
+let pool=pools.cartoon, world='cartoon';
+const trails={},teamMap={},TMAX=60;
+
+const ball=(()=>{
+  const m=new THREE.Mesh(new THREE.SphereGeometry(0.6,16,12),new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x555555}));
+  m.castShadow=true;m.visible=false;m.userData={target:new THREE.Vector3()};scene.add(m);return m;
+})();
+
+function playerColor(id,kind){
+  if(kind==='referee')    return 0xFFD400;
+  if(kind==='goalkeeper') return 0x00E5A0;
+  const team=teamMap[id]||(Number(id)%2===0?'A':'B');
+  return team==='A'
+    ?parseInt(document.getElementById('colA').value.slice(1),16)
+    :parseInt(document.getElementById('colB').value.slice(1),16);
+}
+
+function getPlayer(id,kind){
+  if(!pool[id]){
+    const color=playerColor(id,kind);
+    pool[id]=(world==='realistic')?makeRealPlayer(color):makeMannequin(color);
+    pool[id].userData.kind=kind||'player';
+    setLabel(pool[id],id);
+  }
+  return pool[id];
+}
+
+function addTrail(id,wx,wz){
+  if(!trails[id]){
+    const team=teamMap[id]||(Number(id)%2===0?'A':'B');
+    const color=team==='A'
+      ?parseInt(document.getElementById('colA').value.slice(1),16)
+      :parseInt(document.getElementById('colB').value.slice(1),16);
+    const line=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color,opacity:.6,transparent:true}));
+    scene.add(line);trails[id]={pts:[],line};
+  }
+  const t=trails[id];
+  t.pts.push(new THREE.Vector3(wx,.1,wz));
+  if(t.pts.length>TMAX) t.pts.shift();
+  t.line.geometry.dispose();
+  t.line.geometry=new THREE.BufferGeometry().setFromPoints(t.pts);
+}
+
+function toggleIds(on)    {Object.values(pool).forEach(m=>{const l=m.getObjectByName('label');if(l)l.visible=on;});}
+function toggleTrails(on) {Object.values(trails).forEach(t=>t.line.visible=on);}
+function toggleMarkers(on){Object.values(pool).forEach(m=>{const mk=m.getObjectByName('marker');if(mk)mk.visible=on;const pin=m.getObjectByName('pin');if(pin)pin.visible=on;});}
+function applyColors(){
+  const cA=parseInt(document.getElementById('colA').value.slice(1),16);
+  const cB=parseInt(document.getElementById('colB').value.slice(1),16);
+  Object.keys(pool).forEach(id=>{
+    if(pool[id].userData.kind!=='player') return;
+    const team=teamMap[id]||(Number(id)%2===0?'A':'B');
+    const hex=team==='A'?cA:cB;
+    if(pool[id].userData.recolor) pool[id].userData.recolor(hex);
+    else recolorMannequin(pool[id],hex);
+    if(trails[id]) trails[id].line.material.color.setHex(hex);
+  });
+}
+
+
+// ═══════════════════════════════════════
+// VIDEO + OVERLAY
+// ═══════════════════════════════════════
+let videoReady=false;
+function attachVideo(file){
+  const vid=document.getElementById('vid');
+  vid.src=URL.createObjectURL(file);vid.style.display='block';
+  document.getElementById('vid-overlay').style.display='none';
+  document.getElementById('det-canvas').style.display='block';
+  videoReady=true;
+}
+function syncVideo(ts){if(!videoReady)return;const vid=document.getElementById('vid');if(Math.abs(vid.currentTime-ts)>.15)vid.currentTime=ts;}
+
+const KC=['#ff5000','#00c8ff','#ffc800','#00ff64','#c800ff','#ff0064','#0064ff','#64ff00','#ff9696','#96ff96','#9696ff','#ffff00','#00ffff','#ff00ff','#c8c8c8','#ff8000','#8000ff','#00ff80','#ff0080','#0080ff','#b45050','#50b450','#5050b4','#c89600','#00c896','#9600c8','#64c864','#c86464','#6464c8','#ffff80'];
+function drawDetections(frame,vidEl){
+  const cv=document.getElementById('det-canvas'),ctx=cv.getContext('2d');
+  cv.width=vidEl.clientWidth;cv.height=vidEl.clientHeight;
+  const sw=vidEl.videoWidth||1920,sh=vidEl.videoHeight||1080,dw=vidEl.clientWidth,dh=vidEl.clientHeight;
+  const sc=Math.min(dw/sw,dh/sh),ox=(dw-sw*sc)/2,oy=(dh-sh*sc)/2;
+  ctx.clearRect(0,0,dw,dh);
+  (frame.pitch_keypoints||[]).forEach(k=>{
+    const px=ox+k.pixel[0]*sc,py=oy+k.pixel[1]*sc,c=KC[k.idx%KC.length];
+    ctx.beginPath();ctx.arc(px,py,8,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,.5)';ctx.fill();
+    ctx.beginPath();ctx.arc(px,py,6,0,Math.PI*2);ctx.fillStyle=c;ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='bold 10px Arial';ctx.textAlign='left';ctx.fillText(k.idx,px+9,py-9);
+  });
+  const kl=(frame.pitch_keypoints||[]).length;
+  ctx.fillStyle='rgba(0,0,0,.6)';ctx.beginPath();ctx.roundRect(6,6,130,22,4);ctx.fill();
+  ctx.fillStyle=kl>=4?'#00ff88':'#ff8800';ctx.font='bold 11px Arial';ctx.textAlign='left';
+  ctx.fillText('Keypoints: '+kl+'  '+(kl>=4?'✓':'⚠'),10,21);
+  frame.players.forEach(p=>{
+    const[x1,y1,x2,y2]=p.bbox,rx1=ox+x1*sc,ry1=oy+y1*sc,rw=(x2-x1)*sc,rh=(y2-y1)*sc,hp=p.pitch_pos!==null;
+    ctx.strokeStyle=hp?'#00ff88':'#ff4444';ctx.lineWidth=2;ctx.strokeRect(rx1,ry1,rw,rh);
+    const lbl=hp?('#'+p.id+'  ('+p.pitch_pos[0].toFixed(1)+','+p.pitch_pos[1].toFixed(1)+'m)'):'#'+p.id+'  NO POS';
+    ctx.font='bold 11px Arial';ctx.textAlign='left';const tw=ctx.measureText(lbl).width;
+    ctx.fillStyle=hp?'rgba(0,200,100,.75)':'rgba(200,50,50,.75)';ctx.fillRect(rx1,ry1-18,tw+8,18);
+    ctx.fillStyle='#fff';ctx.fillText(lbl,rx1+4,ry1-5);
+  });
+  ctx.fillStyle='rgba(0,0,0,.6)';ctx.beginPath();ctx.roundRect(6,dh-28,160,22,4);ctx.fill();
+  ctx.fillStyle='#e0e6f0';ctx.font='bold 11px Arial';ctx.textAlign='left';
+  ctx.fillText('Players: '+frame.players.length+'  Mapped: '+frame.players.filter(p=>p.pitch_pos).length,10,dh-13);
+}
+
+
+// ═══════════════════════════════════════
+// PLAYBACK
+// ═══════════════════════════════════════
+let frameData=null,curFrame=0,playing=false,speed=1,lastTick=0,pFps=10;
+
+function loadData(data){
+  frameData=data;
+  pFps=data.metadata.playback_fps||10;
+  curFrame=0;
+  // Pitch size from the backend (pnlcalib = 105x68 FIFA, old yolo = 120x70)
+  const npw=data.metadata.pitch_width||105, nph=data.metadata.pitch_height||68;
+  if(npw!==PW||nph!==PH){ PW=npw; PH=nph; rebuildPitches(); }
+  // Team map from backend kit-colour assignment (player.team: 0/1/-1/null)
+  Object.keys(teamMap).forEach(k=>delete teamMap[k]);
+  data.frames.forEach(f=>f.players.forEach(p=>{
+    if(p.id>=0&&(p.team===0||p.team===1)) teamMap[String(p.id)]=p.team===0?'A':'B';
+  }));
+  // Default jersey pickers to the detected kit colours
+  const kc=data.metadata.teams&&data.metadata.teams.kit_colors;
+  if(kc&&kc.length===2){
+    document.getElementById('colA').value=kc[0];
+    document.getElementById('colB').value=kc[1];
+  }
+  Object.values(pools.cartoon).forEach(m=>scene.remove(m));
+  pools.cartoon={};
+  Object.keys(trails).forEach(id=>{scene.remove(trails[id].line);delete trails[id];});
+  Object.values(pools.realistic).forEach(m=>scene.remove(m));
+  pools.realistic={};
+  pool=pools[world];
+  Object.values(trails).forEach(t=>t.line.visible=false);
+  playing=true;
+  document.getElementById('play-btn').textContent='||';
+  document.getElementById('time-lbl').textContent='0.0s / '+data.metadata.duration.toFixed(1)+'s';
+  renderFrame(0);
+}
+
+function openResultJson(input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{try{loadData(JSON.parse(r.result));}catch(e){alert('Cannot parse JSON: '+e.message);}};
+  r.readAsText(file); input.value='';
+}
+
+function renderFrame(idx){
+  if(!frameData||idx>=frameData.frames.length) return;
+  const f=frameData.frames[idx];
+  const showTr=document.getElementById('sw-trails').checked;
+  const showID=document.getElementById('sw-ids').checked;
+  let mapped=0,total=f.players.length;
+
+  if(!f.homography_available){
+    Object.values(pool).forEach(m=>m.visible=false);ball.visible=false;
+    Object.values(trails).forEach(t=>t.line.visible=showTr);
+    syncVideo(f.timestamp);
+    if(videoReady)drawDetections(f,document.getElementById('vid'));
+    document.getElementById('h-frame').textContent=idx+1;
+    document.getElementById('h-time').textContent=f.timestamp.toFixed(2);
+    document.getElementById('h-players').textContent='0/'+total;
+    document.getElementById('h-homo').textContent='NO';
+    document.getElementById('time-lbl').textContent=f.timestamp.toFixed(1)+'s / '+frameData.metadata.duration.toFixed(1)+'s';
+    document.getElementById('tl-fill').style.width=(idx/Math.max(frameData.frames.length-1,1)*100)+'%';
+    return;
+  }
+
+  const active=new Set();
+  f.players.forEach(p=>{
+    const id=p.id<0?'u'+Math.abs(p.id):String(p.id);
+    active.add(id);
+    if(!p.pitch_pos) return;
+    mapped++;
+    const wx=p.pitch_pos[0]-PW/2, wz=p.pitch_pos[1]-PH/2;
+    const m=getPlayer(id,p.kind);
+    // Per-frame team (handles mid-track team flips from corrected ID swaps)
+    if(p.kind==='player'&&(p.team===0||p.team===1)){
+      const tm=p.team===0?'A':'B';
+      if(m.userData.teamCur!==tm){
+        m.userData.teamCur=tm;
+        const hex=parseInt(document.getElementById(tm==='A'?'colA':'colB').value.slice(1),16);
+        if(m.userData.recolor) m.userData.recolor(hex); else recolorMannequin(m,hex);
+        if(trails[id]) trails[id].line.material.color.setHex(hex);
+      }
+    }
+    const wasHidden=!m.visible;
+    m.userData.target.set(wx,0,wz);
+    if(wasHidden||p.snap){
+      m.position.set(wx,0,wz);
+      if(p.snap&&trails[id]) trails[id].pts.length=0;
+    }
+    m.visible=true;
+
+    if(world==='realistic' && m.userData.B){
+      if(p.kpts3d) pose3DReal(m.userData, p.kpts3d);
+      else         poseRestReal(m.userData);
+    }
+
+    const lbl=m.getObjectByName('label');
+    if(lbl) lbl.visible=showID;
+    if(showTr) addTrail(id,wx,wz);
+  });
+
+  Object.keys(pool).forEach(id=>{if(!active.has(id))pool[id].visible=false;});
+  f.players.forEach(p=>{const id=p.id<0?'u'+Math.abs(p.id):String(p.id);if(!p.pitch_pos&&pool[id])pool[id].visible=false;});
+  Object.values(trails).forEach(t=>t.line.visible=showTr);
+
+  if(f.ball&&f.ball.pitch_pos){
+    const bx=f.ball.pitch_pos[0]-PW/2,bz=f.ball.pitch_pos[1]-PH/2;
+    ball.userData.target.set(bx,.6,bz);if(!ball.visible)ball.position.set(bx,.6,bz);ball.visible=true;
+  } else ball.visible=false;
+
+  syncVideo(f.timestamp);
+  if(videoReady)drawDetections(f,document.getElementById('vid'));
+  document.getElementById('h-frame').textContent=idx+1;
+  document.getElementById('h-time').textContent=f.timestamp.toFixed(2);
+  document.getElementById('h-players').textContent=mapped+'/'+total;
+  document.getElementById('h-homo').textContent='YES';
+  document.getElementById('time-lbl').textContent=f.timestamp.toFixed(1)+'s / '+frameData.metadata.duration.toFixed(1)+'s';
+  document.getElementById('tl-fill').style.width=(idx/Math.max(frameData.frames.length-1,1)*100)+'%';
+}
+
+function togglePlay(){playing=!playing;document.getElementById('play-btn').textContent=playing?'||':'>';}
+function setSpd(s,btn){speed=s;document.querySelectorAll('.spd').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+function seek(e){if(!frameData)return;const r=document.getElementById('timeline').getBoundingClientRect();curFrame=Math.floor((e.clientX-r.left)/r.width*frameData.frames.length);renderFrame(curFrame);}
+
+
+// ═══════════════════════════════════════
+// CAMERA PRESETS
+// ═══════════════════════════════════════
+const PRESETS={broadcast:{pos:[0,32,58],tgt:[0,0,0]},top:{pos:[0,90,.1],tgt:[0,0,0]},sideline:{pos:[0,14,74],tgt:[0,0,0]},corner:{pos:[-66,26,56],tgt:[0,0,0]}};
+function setPreset(name){
+  const p=PRESETS[name];if(!p)return;
+  const s0=camera.position.clone(),t0=ctrl.target.clone();
+  const ep=new THREE.Vector3(...p.pos),et=new THREE.Vector3(...p.tgt);
+  let t=null;
+  (function go(ts){if(!t)t=ts;const e=1-Math.pow(1-Math.min((ts-t)/700,1),3);camera.position.lerpVectors(s0,ep,e);ctrl.target.lerpVectors(t0,et,e);if(e<1)requestAnimationFrame(go);})(performance.now());
+}
+
+
+// ═══════════════════════════════════════
+// UPLOAD & POLL
+// ═══════════════════════════════════════
+async function uploadVideo(input){
+  const file=input.files[0];if(!file)return;
+  attachVideo(file);
+  document.getElementById('prog-overlay').style.display='flex';
+  document.getElementById('prog-msg').textContent='Uploading...';
+  try{
+    const fd=new FormData();fd.append('video',file);
+    const r=await fetch('/process',{method:'POST',body:fd});
+    if(!r.ok)throw new Error('Upload failed');
+    const{job_id}=await r.json();
+    const poll=setInterval(async()=>{
+      const sd=await(await fetch('/status/'+job_id)).json();
+      if(sd.progress){const pct=sd.progress.percent||0;document.getElementById('prog-bar').style.width=pct+'%';document.getElementById('prog-pct').textContent=pct.toFixed(0)+'%';document.getElementById('prog-msg').textContent='Frame '+(sd.progress.frame||0)+' / '+(sd.progress.total||'?');}
+      if(sd.status==='done'){clearInterval(poll);const data=await(await fetch('/result/'+job_id)).json();document.getElementById('prog-overlay').style.display='none';loadData(data);}
+      else if(sd.status==='error'){clearInterval(poll);document.getElementById('prog-msg').textContent='Error: '+sd.error;}
+    },1000);
+  }catch(err){document.getElementById('prog-msg').textContent='Error: '+err.message;}
+}
+
+function screenshot(){renderer.render(scene,camera);const a=document.createElement('a');a.download='tactics_'+Date.now()+'.png';a.href=canvas3d.toDataURL('image/png');a.click();}
+
+
+// ═══════════════════════════════════════
+// RESIZE + RENDER LOOP
+// ═══════════════════════════════════════
+function onResize(){const p=document.getElementById('three-panel');renderer.setSize(p.clientWidth,p.clientHeight,false);camera.aspect=p.clientWidth/p.clientHeight;camera.updateProjectionMatrix();}
+window.addEventListener('resize',onResize);onResize();
+
+(function loop(ts){
+  requestAnimationFrame(loop);
+  ctrl.update();
+  Object.values(pool).forEach(m=>{if(m.visible&&m.userData.target)m.position.lerp(m.userData.target,.35);});
+  if(world==='realistic'){
+    Object.values(pool).forEach(m=>{
+      if(!m.visible)return;
+      const dx=m.userData.target.x-m.position.x,dz=m.userData.target.z-m.position.z;
+      if(dx*dx+dz*dz>4e-4){const want=Math.atan2(dx,dz);let dy=want-m.rotation.y;dy=Math.atan2(Math.sin(dy),Math.cos(dy));m.rotation.y+=dy*.18;}
+    });
+  }
+  if(ball.visible)ball.position.lerp(ball.userData.target,.45);
+  if(frameData&&playing){const fd=1000/pFps/speed;if(ts-lastTick>=fd){curFrame=(curFrame+1)%frameData.frames.length;renderFrame(curFrame);lastTick=ts;}}
+  renderer.render(scene,camera);
+})(0);
+
+</script>
+</body>
+</html>

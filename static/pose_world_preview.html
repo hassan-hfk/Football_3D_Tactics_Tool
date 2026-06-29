@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pose in 3D — Preview</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0f14;font-family:system-ui,Arial,sans-serif;}
+  #c{display:block;width:100vw;height:100vh;}
+  #ui{position:fixed;top:14px;left:14px;z-index:10;color:#fff;}
+  #ui h1{font-size:15px;margin:0 0 2px;font-weight:700;}
+  #ui p{margin:0 0 10px;font-size:12px;color:#aeb6c2;max-width:340px;}
+  .row{display:flex;gap:6px;flex-wrap:wrap;max-width:340px;margin-bottom:6px;}
+  .lbl{font-size:11px;color:#8b93a0;margin:2px 0;}
+  button{background:rgba(20,28,38,.82);color:#e6edf5;border:1px solid rgba(255,255,255,.14);
+    padding:7px 11px;border-radius:8px;font-size:12px;cursor:pointer;backdrop-filter:blur(6px);}
+  button:hover{background:rgba(40,54,72,.9);}
+  button.on{background:#2f7d4f;border-color:#3da565;}
+  #hint{position:fixed;bottom:14px;right:14px;z-index:10;color:#8b93a0;font-size:11px;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>Pose in 3D — preview</h1>
+  <p>The figure is rebuilt from 17 COCO keypoints (the ViTPose output) every frame. Drag to orbit, scroll to zoom.</p>
+  <div class="lbl">POSE (sample data standing in for real keypoints)</div>
+  <div class="row">
+    <button data-p="stand" class="on">Standing</button>
+    <button data-p="run">Running</button>
+    <button data-p="kick">Kicking</button>
+    <button id="auto">Auto-cycle</button>
+  </div>
+  <div class="lbl">CAMERA</div>
+  <div class="row">
+    <button data-v="broadcast" class="on">Broadcast</button>
+    <button data-v="sideline">Sideline</button>
+    <button data-v="closeup">Close-up</button>
+  </div>
+</div>
+<div id="hint">preview — sample poses; live data flows from pipeline kpts</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const PW=120, PH=70;
+const PBL=20.15, PBW=41, GBL=5.5, GBW=18.32, PSD=11, CCR=9.15;
+const wx=mx=>mx-PW/2, wz=my=>my-PH/2;
+const KP_T=0.3;                                  // keypoint confidence threshold
+const UP=new THREE.Vector3(0,1,0);
+
+// ── renderer / scene / camera ───────────────────────────────
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+const scene=new THREE.Scene();
+scene.background=skyTexture(); scene.fog=new THREE.Fog(0xcfe1f2,170,380);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.4,1000);
+
+scene.add(new THREE.HemisphereLight(0xbfd8ff,0x3a5a2e,0.55));
+const sun=new THREE.DirectionalLight(0xfff3e0,2.5); sun.position.set(45,95,35);
+sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.near=1; sun.shadow.camera.far=320;
+sun.shadow.camera.left=-90; sun.shadow.camera.right=90; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
+sun.shadow.bias=-0.0004; scene.add(sun);
+const fill=new THREE.DirectionalLight(0xaecbff,0.5); fill.position.set(-50,40,-30); scene.add(fill);
+
+// ── ground + pitch + goals ─────────────────────────────────
+const surround=new THREE.Mesh(new THREE.PlaneGeometry(420,360),new THREE.MeshStandardMaterial({color:0x2f5e2c,roughness:1}));
+surround.rotation.x=-Math.PI/2; surround.position.y=-0.05; surround.receiveShadow=true; scene.add(surround);
+const TWm=128, THm=78;
+const pitch=new THREE.Mesh(new THREE.PlaneGeometry(TWm,THm),new THREE.MeshStandardMaterial({map:pitchTexture(),roughness:0.92}));
+pitch.rotation.x=-Math.PI/2; pitch.receiveShadow=true; scene.add(pitch);
+goal(wx(0)); goal(wx(120));
+function goal(gx){ const post=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4}); const hw=7.32/2, gh=2.44;
+  const bar=r=>new THREE.CylinderGeometry(r,r,gh,10);
+  const p1=new THREE.Mesh(bar(0.06),post); p1.position.set(gx,gh/2,-hw); scene.add(p1);
+  const p2=new THREE.Mesh(bar(0.06),post); p2.position.set(gx,gh/2, hw); scene.add(p2);
+  const cb=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,2*hw,10),post); cb.rotation.x=Math.PI/2; cb.position.set(gx,gh,0); scene.add(cb);
+}
+
+// ════════════════════════════════════════════════════════════
+//  Pose figure: capsule body rebuilt from COCO-17 each frame
+//  Bone lengths are fixed; directions come from the keypoints
+//  (image x -> local X, image -y -> local Y, depth = 0 plane).
+// ════════════════════════════════════════════════════════════
+function mat(c,r){ return new THREE.MeshStandardMaterial({color:c,roughness:(r??0.78),metalness:0}); }
+const _cap={};
+function capsuleGeo(r,len){ const k=r.toFixed(3)+'_'+len.toFixed(3); if(_cap[k])return _cap[k];
+  const pts=[],seg=8;
+  for(let i=0;i<=seg;i++){const e=-Math.PI/2+(i/seg)*(Math.PI/2); pts.push(new THREE.Vector2(Math.cos(e)*r,-len/2+Math.sin(e)*r));}
+  for(let i=0;i<=seg;i++){const e=(i/seg)*(Math.PI/2); pts.push(new THREE.Vector2(Math.cos(e)*r, len/2+Math.sin(e)*r));}
+  const g=new THREE.LatheGeometry(pts,16); g.computeVertexNormals(); _cap[k]=g; return g; }
+
+// bone rest lengths (meters)
+const L={spine:0.50,hips:0.20,sh:0.36,uarm:0.28,farm:0.26,thigh:0.44,shin:0.44,foot:0.18,neck:0.25};
+
+function makePoseFigure(p){
+  const g=new THREE.Group();
+  const jersey=mat(p.jersey,0.7), shorts=mat(p.shorts,0.7), socks=mat(p.socks,0.8),
+        skin=mat(p.skin??0xe8b58c,0.78), hair=mat(p.hair??0x20140c,0.85), boot=mat(0x161616,0.45);
+  const capMesh=(m,r,len)=>{const me=new THREE.Mesh(capsuleGeo(r,len),m); me.castShadow=true; g.add(me); return me;};
+  const ball=(m,r)=>{const me=new THREE.Mesh(new THREE.SphereGeometry(r,12,10),m); me.castShadow=true; g.add(me); return me;};
+  const B={
+    spine:capMesh(jersey,0.15,L.spine), hips:capMesh(shorts,0.15,L.hips), sh:capMesh(jersey,0.085,L.sh),
+    uarmL:capMesh(jersey,0.052,L.uarm), farmL:capMesh(skin,0.043,L.farm),
+    uarmR:capMesh(jersey,0.052,L.uarm), farmR:capMesh(skin,0.043,L.farm),
+    thighL:capMesh(skin,0.075,L.thigh), shinL:capMesh(socks,0.06,L.shin),
+    thighR:capMesh(skin,0.075,L.thigh), shinR:capMesh(socks,0.06,L.shin),
+    footL:capMesh(boot,0.05,L.foot), footR:capMesh(boot,0.05,L.foot),
+  };
+  const S={ shL:ball(jersey,0.082), shR:ball(jersey,0.082), elL:ball(skin,0.047), elR:ball(skin,0.047),
+            knL:ball(skin,0.07), knR:ball(skin,0.07), hip:ball(shorts,0.12), head:ball(skin,0.108) };
+  const hair2=new THREE.Mesh(new THREE.SphereGeometry(0.114,14,12,0,Math.PI*2,0,Math.PI*0.58),hair); g.add(hair2);
+  const sh=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.9),new THREE.MeshBasicMaterial({map:blobTexture(),transparent:true,depthWrite:false}));
+  sh.rotation.x=-Math.PI/2; sh.position.y=0.012; g.add(sh);
+  g.scale.setScalar(1.25);
+  g.userData={B,S,hair2};
+  return g;
+}
+
+function setBone(mesh,a,b){ const d=new THREE.Vector3().subVectors(b,a);
+  mesh.position.copy(a).add(b).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(UP,d.normalize()); }
+
+// reconstruct the figure's local joints from COCO-17 and update meshes
+function poseFigure(g, kpts){
+  const {B,S,hair2}=g.userData;
+  const c=i=>kpts[i][2], P=i=>new THREE.Vector2(kpts[i][0],kpts[i][1]);
+  const avg=(i,j)=>new THREE.Vector2((kpts[i][0]+kpts[j][0])/2,(kpts[i][1]+kpts[j][1])/2);
+  const ok=(...idx)=>idx.every(i=>c(i)>=KP_T);
+  // direction in figure plane (image x -> +X, image y(down) -> -Y, depth 0)
+  const dir=(a,b,fb)=>{ if(!ok(a,b)) return fb.clone();
+    const v=P(b).sub(P(a)); const d=new THREE.Vector3(v.x,-v.y,0);
+    return d.lengthSq()<1e-9?fb.clone():d.normalize(); };
+  const dirV=(a2,b2,fb)=>{ const v=b2.clone().sub(a2); const d=new THREE.Vector3(v.x,-v.y,0);
+    return d.lengthSq()<1e-9?fb.clone():d.normalize(); };
+
+  const midHip=avg(11,12), midSh=avg(5,6);
+  const haveTrunk = ok(11,12,5,6);
+  const step=(from,d,len)=>from.clone().addScaledVector(d,len);
+
+  const hipC=new THREE.Vector3(0,0,0);
+  const uHip=dir(11,12,new THREE.Vector3(1,0,0));
+  const hipL=step(hipC,uHip,-L.hips/2), hipR=step(hipC,uHip, L.hips/2);
+  const dSpine = haveTrunk ? dirV(midHip,midSh,new THREE.Vector3(0,1,0)) : new THREE.Vector3(0,1,0);
+  const midShP=step(hipC,dSpine,L.spine);
+  const uSh=dir(5,6,new THREE.Vector3(1,0,0));
+  const shL=step(midShP,uSh,-L.sh/2), shR=step(midShP,uSh, L.sh/2);
+  const dHead = (c(0)>=KP_T && haveTrunk) ? dirV(midSh,P(0),new THREE.Vector3(0,1,0)) : new THREE.Vector3(0,1,0);
+  const headP=step(midShP,dHead,L.neck);
+
+  const elL=step(shL,dir(5,7,new THREE.Vector3(0,-1,0)),L.uarm), wrL=step(elL,dir(7,9,new THREE.Vector3(0,-1,0)),L.farm);
+  const elR=step(shR,dir(6,8,new THREE.Vector3(0,-1,0)),L.uarm), wrR=step(elR,dir(8,10,new THREE.Vector3(0,-1,0)),L.farm);
+  const knL=step(hipL,dir(11,13,new THREE.Vector3(0,-1,0)),L.thigh), anL=step(knL,dir(13,15,new THREE.Vector3(0,-1,0)),L.shin);
+  const knR=step(hipR,dir(12,14,new THREE.Vector3(0,-1,0)),L.thigh), anR=step(knR,dir(14,16,new THREE.Vector3(0,-1,0)),L.shin);
+  const footFwd=new THREE.Vector3(0,-0.25,1).normalize();
+  const ftL=step(anL,footFwd,L.foot), ftR=step(anR,footFwd,L.foot);
+
+  // put feet on the ground
+  const minY=Math.min(anL.y,anR.y,ftL.y,ftR.y);
+  const yShift=-minY+0.06;
+  [hipC,hipL,hipR,midShP,shL,shR,headP,elL,wrL,elR,wrR,knL,anL,knR,anR,ftL,ftR].forEach(v=>v.y+=yShift);
+
+  setBone(B.spine,hipC,midShP); setBone(B.hips,hipL,hipR); setBone(B.sh,shL,shR);
+  setBone(B.uarmL,shL,elL); setBone(B.farmL,elL,wrL); setBone(B.uarmR,shR,elR); setBone(B.farmR,elR,wrR);
+  setBone(B.thighL,hipL,knL); setBone(B.shinL,knL,anL); setBone(B.thighR,hipR,knR); setBone(B.shinR,knR,anR);
+  setBone(B.footL,anL,ftL); setBone(B.footR,anR,ftR);
+  S.shL.position.copy(shL); S.shR.position.copy(shR); S.elL.position.copy(elL); S.elR.position.copy(elR);
+  S.knL.position.copy(knL); S.knR.position.copy(knR); S.hip.position.copy(hipC);
+  S.head.position.copy(headP); hair2.position.copy(headP).add(new THREE.Vector3(0,0.02,-0.01));
+}
+
+// ── sample COCO poses (normalised image coords; conf last) ──
+// index: 0 nose 1 eyeL 2 eyeR 3 earL 4 earR 5 shL 6 shR 7 elL 8 elR 9 wrL 10 wrR
+//        11 hipL 12 hipR 13 knL 14 knR 15 anL 16 anR
+function P(arr){ return arr.map(a=>[a[0],a[1],a[2]??0.9]); }
+const POSES={
+  stand:P([[.50,.10],[.48,.09],[.52,.09],[.45,.10],[.55,.10],
+           [.41,.22],[.59,.22],[.38,.37],[.62,.37],[.37,.52],[.63,.52],
+           [.45,.52],[.55,.52],[.44,.74],[.56,.74],[.44,.97],[.56,.97]]),
+  run:  P([[.55,.10],[.53,.09],[.57,.09],[.50,.10],[.59,.10],
+           [.45,.22],[.62,.22],[.44,.34],[.66,.40],[.49,.27],[.70,.52],
+           [.46,.52],[.57,.52],[.53,.66],[.49,.80],[.60,.72],[.45,.96]]),
+  kick: P([[.50,.10],[.48,.09],[.52,.09],[.45,.10],[.55,.10],
+           [.40,.22],[.60,.22],[.33,.33],[.67,.33],[.27,.40],[.73,.40],
+           [.45,.52],[.56,.52],[.45,.74],[.63,.66],[.45,.97],[.80,.58]]),
+};
+let target=POSES.stand, current=POSES.stand.map(a=>a.slice());
+function lerpPose(cur,tgt,t){ for(let i=0;i<17;i++){ cur[i][0]+=(tgt[i][0]-cur[i][0])*t; cur[i][1]+=(tgt[i][1]-cur[i][1])*t; cur[i][2]=tgt[i][2]; } }
+
+// ── place two players + a ball ──────────────────────────────
+const A={jersey:0xcc2222,shorts:0xffffff,socks:0xcc2222};
+const B={jersey:0x1144cc,shorts:0x1144cc,socks:0xffffff};
+const figs=[];
+function addFig(pal,mx,my,phase){ const g=makePoseFigure(pal); g.position.set(wx(mx),0,wz(my)); scene.add(g);
+  figs.push({g,phase,cur:POSES.stand.map(a=>a.slice())}); }
+addFig(A,52,35,0); addFig(B,68,35,0.5);
+const ballMesh=new THREE.Mesh(new THREE.SphereGeometry(0.32,18,14),new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4,emissive:0x222222}));
+ballMesh.castShadow=true; ballMesh.position.set(wx(60),0.32,wz(35)); scene.add(ballMesh);
+
+// ── orbit camera ────────────────────────────────────────────
+const ctrl={target:new THREE.Vector3(0,1.4,0),r:26,theta:Math.PI*1.4,phi:0.78,drag:false,px:0,py:0,
+  apply(){const t=this.target; camera.position.set(t.x+this.r*Math.sin(this.phi)*Math.cos(this.theta),t.y+this.r*Math.cos(this.phi),t.z+this.r*Math.sin(this.phi)*Math.sin(this.theta)); camera.lookAt(t);},
+  view(r,th,ph,ty){this.r=r;this.theta=th;this.phi=ph;this.target.y=(ty??1.4);this.apply();}};
+ctrl.apply();
+canvas.addEventListener('mousedown',e=>{ctrl.drag=true;ctrl.px=e.clientX;ctrl.py=e.clientY;});
+addEventListener('mouseup',()=>ctrl.drag=false);
+addEventListener('mousemove',e=>{if(!ctrl.drag)return; ctrl.theta-=(e.clientX-ctrl.px)*0.005; ctrl.phi-=(e.clientY-ctrl.py)*0.005;
+  ctrl.phi=Math.max(0.06,Math.min(Math.PI*0.49,ctrl.phi)); ctrl.px=e.clientX;ctrl.py=e.clientY; ctrl.apply();});
+canvas.addEventListener('wheel',e=>{e.preventDefault(); ctrl.r*=1+Math.sign(e.deltaY)*0.08; ctrl.r=Math.max(4,Math.min(180,ctrl.r)); ctrl.apply();},{passive:false});
+const VIEWS={broadcast:[60,Math.PI*1.5,0.74,2], sideline:[28,Math.PI*1.4,0.9,1.2], closeup:[7,Math.PI*1.35,0.85,1.2]};
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ document.querySelectorAll('[data-v]').forEach(x=>x.classList.remove('on')); b.classList.add('on'); ctrl.view(...VIEWS[b.dataset.v]); });
+
+// ── pose controls ───────────────────────────────────────────
+let auto=false, autoT=0; const order=['stand','run','kick'];
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{ auto=false; document.getElementById('auto').classList.remove('on');
+  document.querySelectorAll('[data-p]').forEach(x=>x.classList.remove('on')); b.classList.add('on'); target=POSES[b.dataset.p]; });
+document.getElementById('auto').onclick=function(){ auto=!auto; this.classList.toggle('on',auto); };
+
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);});
+
+(function loop(){ requestAnimationFrame(loop);
+  if(auto){ autoT+=1/60; if(autoT>1.6){autoT=0; target=POSES[order[(order.indexOf(poseKey(target))+1)%3]];} }
+  figs.forEach(f=>{
+    lerpPose(f.cur, target, 0.12);
+    poseFigure(f.g, f.cur);
+    // face the camera (yaw only) so the in-plane pose reads correctly from any orbit
+    f.g.rotation.y = Math.atan2(camera.position.x - f.g.position.x, camera.position.z - f.g.position.z);
+  });
+  renderer.render(scene,camera);
+})();
+function poseKey(p){ for(const k in POSES) if(POSES[k]===p) return k; return 'stand'; }
+
+// ── textures ────────────────────────────────────────────────
+function pitchTexture(){ const CW=2048,CH=Math.round(CW*THm/TWm); const cv=document.createElement('canvas');cv.width=CW;cv.height=CH;const x=cv.getContext('2d');
+  const sx=CW/TWm,sy=CH/THm,px=mx=>(mx+4)*sx,py=my=>(my+4)*sy;
+  x.fillStyle='#3c8a3a';x.fillRect(0,0,CW,CH); const bands=14;
+  for(let i=0;i<bands;i++){x.fillStyle=i%2?'#3f9140':'#368534';x.fillRect(i*CW/bands,0,CW/bands+1,CH);}
+  for(let i=0;i<24000;i++){x.fillStyle='rgba(0,0,0,'+(Math.random()*0.05)+')';x.fillRect(Math.random()*CW,Math.random()*CH,2,2);}
+  x.strokeStyle='#f4f8f4';x.lineWidth=Math.max(2,sx*0.12);x.lineCap='round';
+  const rect=(a,b,c,d)=>{x.beginPath();x.rect(px(a),py(b),(c-a)*sx,(d-b)*sy);x.stroke();};
+  const line=(a,b,c,d)=>{x.beginPath();x.moveTo(px(a),py(b));x.lineTo(px(c),py(d));x.stroke();};
+  const circ=(a,b,r)=>{x.beginPath();x.arc(px(a),py(b),r*sx,0,Math.PI*2);x.stroke();};
+  rect(0,0,PW,PH); line(PW/2,0,PW/2,PH); circ(PW/2,PH/2,CCR);
+  rect(0,(PH-PBW)/2,PBL,(PH+PBW)/2); rect(0,(PH-GBW)/2,GBL,(PH+GBW)/2);
+  rect(PW-PBL,(PH-PBW)/2,PW,(PH+PBW)/2); rect(PW-GBL,(PH-GBW)/2,PW,(PH+GBW)/2);
+  const t=new THREE.CanvasTexture(cv); t.encoding=THREE.sRGBEncoding; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); return t; }
+function blobTexture(){ const cv=document.createElement('canvas');cv.width=128;cv.height=128;const x=cv.getContext('2d');
+  const g=x.createRadialGradient(64,64,4,64,64,62); g.addColorStop(0,'rgba(0,0,0,.5)');g.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=g;x.fillRect(0,0,128,128); return new THREE.CanvasTexture(cv); }
+function skyTexture(){ const cv=document.createElement('canvas');cv.width=16;cv.height=256;const x=cv.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,256); g.addColorStop(0,'#5aa6ee');g.addColorStop(0.55,'#9ccbf0');g.addColorStop(1,'#dcebf7');
+  x.fillStyle=g;x.fillRect(0,0,16,256); const t=new THREE.CanvasTexture(cv); t.encoding=THREE.sRGBEncoding; return t; }
+</script>
+</body>
+</html>

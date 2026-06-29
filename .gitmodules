@@ -1,0 +1,11 @@
+[submodule "PnLCalib"]
+	path = PnLCalib
+	url = https://github.com/mguti97/No-Bells-Just-Whistles.git
+
+[submodule "GVHMR"]
+	path = GVHMR
+	url = https://github.com/zju3dv/GVHMR.git
+
+[submodule "MotionBERT"]
+	path = MotionBERT
+	url = https://github.com/Walter0807/MotionBERT.git
