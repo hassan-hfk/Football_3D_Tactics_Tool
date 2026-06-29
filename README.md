@@ -96,8 +96,8 @@ Triggered separately after Pass 1. Reads the Pass 1 JSON and for each qualifying
 
 ```bash
 # 1. Clone with submodules
-git clone --recurse-submodules https://github.com/YOUR_USERNAME/forma3d.git
-cd forma3d/app
+git clone --recurse-submodules https://github.com/hassan-hfk/Football_3D_Tactics_Tool.git
+cd Football_3D_Tactics_Tool
 
 # 2. Virtual environment
 python -m venv .venv
@@ -127,7 +127,7 @@ Full environment setup, GVHMR checkpoints, SMPL-X model files, pytorch3d build i
 ## Repository Layout
 
 ```
-app/
+Football_3D_Tactics_Tool/       ← repo root
 ├── main.py                  FastAPI server — all HTTP endpoints + SSE log broadcast
 ├── pipeline.py              Pass 1 — detection, tracking, homography, team, pose
 ├── pnl_homography.py        PnLCalib wrapper — HRNet forward, RANSAC solve, H output
