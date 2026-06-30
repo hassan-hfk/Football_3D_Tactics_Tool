@@ -3,7 +3,10 @@
 > Convert broadcast football footage into interactive 3D tactical reconstructions — in your browser, no extra software needed.
 
 <!-- BANNER IMAGE — replace this comment with your screenshot -->
-<!-- ![FORMA 3D banner](docs/assets/banner.png) -->
+
+
+https://github.com/user-attachments/assets/e5236894-074d-4502-a9bc-b390d4d30232
+
 
 ---
 
